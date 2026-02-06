@@ -205,9 +205,9 @@ graph TB
         D1[Docker Container<br/>172.17.0.2]
         D1 -.-> BR[docker0 bridge<br/>172.17.0.1]
         BR -.-> H1[Host eth0<br/>172.31.41.197]
-        BR -.x-> H2[Host wt0<br/>100.126.106.20]
+        BR -.->|❌ Blocked| H2[Host wt0<br/>100.126.106.20]
         
-        Note1[❌ DNS queries to 100.126.106.20<br/>cannot reach container]
+        Note1[DNS queries to 100.126.106.20<br/>cannot reach container]
     end
     
     subgraph Correct["✅ Host Mode network_mode: host"]
@@ -216,7 +216,7 @@ graph TB
         D2 -->|Direct Access| H4[Host wt0<br/>100.126.106.20]
         D2 -->|Direct Access| H5[localhost<br/>127.0.0.1]
         
-        Note2[✅ DNS queries to ANY interface<br/>reach AdGuard directly]
+        Note2[DNS queries to ANY interface<br/>reach AdGuard directly]
     end
 ```
 
