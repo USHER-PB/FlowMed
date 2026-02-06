@@ -1,6 +1,16 @@
-# AdGuard Home + NetBird Integration Tutorial
+# AdGuard Home + NetBird Integration
 
-Network-wide ad blocking with secure remote access via VPN mesh network.
+## Professional Deployment Guide
+
+**Network-wide ad blocking with secure remote access via VPN mesh network**
+
+---
+
+> **📋 Document Information**  
+> **Type:** Implementation Tutorial  
+> **Level:** Intermediate  
+> **Time to Complete:** 2-3 hours  
+> **Target Platform:** AWS EC2 (Ubuntu 24.04 LTS)
 
 ---
 
@@ -84,7 +94,8 @@ sequenceDiagram
 - 📊 Centralized DNS management
 - ⚡ Faster page loads, less tracking
 
-> 📚 **Want deeper technical details?** See [AdGuard + NetBird Deep Dive](../reference/adguard_netbird_deep_dive.md)
+> 📚 **For Technical Details:**  
+> This tutorial provides practical implementation steps. For in-depth technical explanations, architecture deep-dives, and advanced configurations, see the [AdGuard + NetBird Deep Dive Reference](../reference/adguard_netbird_deep_dive.md).
 
 ---
 
@@ -123,6 +134,9 @@ graph LR
 ---
 
 ## AWS Infrastructure Setup
+
+> **☁️ AWS Console Actions**  
+> The following steps are performed in the AWS Management Console.
 
 ### Step 1: Launch EC2 Instances
 
@@ -284,7 +298,8 @@ ping -c 3 100.126.106.20
 
 **Expected:** ✅ Replies received
 
-> 💡 **Tip:** Note down each server's NetBird IP. You'll need the AdGuard server's NetBird IP later.
+> 💡 **Important Note**  
+> Record each server's NetBird IP address. The AdGuard server's NetBird IP (`100.126.x.x`) will be required for DNS configuration in subsequent steps.
 
 ---
 
@@ -343,10 +358,11 @@ services:
 EOF
 ```
 
-> **Why `network_mode: host`?**
+> **ℹ️ Technical Note: Host Network Mode**  
+> Using `network_mode: host` is essential for this deployment:
 > - Allows AdGuard to bind to all network interfaces (VPC, NetBird, localhost)
-> - Simplifies DNS port (53) management
-> - Required for multi-interface DNS listening
+> - Eliminates port mapping complexity for DNS (port 53)
+> - Enables multi-interface DNS listening required for this architecture
 
 ### Step 4: Start AdGuard
 

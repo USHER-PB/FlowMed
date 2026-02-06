@@ -1,6 +1,16 @@
-# AdGuard Home + NetBird Integration: Deep Dive
+# AdGuard Home + NetBird Integration
 
-Comprehensive technical reference for understanding and troubleshooting the AdGuard Home and NetBird integration.
+## Technical Reference & Deep Dive
+
+**Comprehensive technical documentation for understanding, configuring, and troubleshooting the AdGuard Home and NetBird integration.**
+
+---
+
+> **📋 Document Information**  
+> **Type:** Technical Reference  
+> **Level:** Advanced  
+> **Audience:** System administrators, DevOps engineers, Network engineers  
+> **Companion Document:** [Deployment Tutorial](../tutorial/deploying_and_integrating_adguard_with_netbird.md)
 
 ---
 
@@ -18,6 +28,9 @@ Comprehensive technical reference for understanding and troubleshooting the AdGu
 ---
 
 ## Networking Fundamentals
+
+> **🎯 Section Overview**  
+> This section covers the fundamental networking concepts required to understand the AdGuard + NetBird integration, including IP ranges, VPN mesh architecture, and DNS protocol basics.
 
 ### IP Address Ranges
 
@@ -101,6 +114,9 @@ sequenceDiagram
 ---
 
 ## Architecture Deep Dive
+
+> **🎯 Section Overview**  
+> Detailed breakdown of system components, network topology, Docker networking, and DNS query routing mechanisms.
 
 ### Component Topology
 
@@ -314,7 +330,7 @@ graph LR
     STUB -->|D-Bus| RESOLVED[systemd-resolved<br/>127.0.0.53:53]
     RESOLVED -->|Query| UPSTREAM[Upstream DNS<br/>100.126.106.20]
     
-    CONFIG[/etc/resolv.conf<br/>→ /run/systemd/resolve/stub-resolv.conf] -.->|Points to| RESOLVED
+    CONFIG["resolv.conf symlink<br/>points to stub-resolv.conf"] -.->|Symlink| RESOLVED
 ```
 
 **Configuration Files:**
@@ -413,7 +429,402 @@ Domains=~.
 
 ---
 
+## Using NetBird DNS as Main System Resolver
+
+> **⚠️ Advanced Configuration Warning**  
+> This section describes an advanced configuration where NetBird DNS becomes your system-wide DNS resolver. This differs from the recommended per-interface approach and has significant implications for system behavior. Only implement this if you fully understand the trade-offs.
+
+### Overview
+
+When you configure your machine to use NetBird DNS as the **primary system-wide DNS resolver**, all DNS queries (even when not connected to NetBird) are directed through AdGuard Home. This section explains the implications, configuration, and reverting process.
+
+> **⚠️ Important Distinction:**
+> - **NetBird interface DNS** (recommended): DNS only routes through AdGuard when connected to NetBird VPN
+> - **System-wide DNS** (this section): All DNS queries always route through AdGuard, regardless of VPN status
+
+### Decision Matrix
+
+```mermaid
+flowchart TD
+    START([Configure DNS])
+    Q1{Always want<br/>ad blocking?}
+    Q2{NetBird always<br/>connected?}
+    Q3{Trust AdGuard<br/>for all DNS?}
+    
+    NETBIRD[Per-Interface DNS<br/>NetBird only]
+    SYSTEM[System-wide DNS<br/>Always active]
+    
+    START --> Q1
+    Q1 -->|Yes| Q2
+    Q1 -->|No| NETBIRD
+    Q2 -->|Yes| Q3
+    Q2 -->|No| NETBIRD
+    Q3 -->|Yes| SYSTEM
+    Q3 -->|No| NETBIRD
+    
+    style NETBIRD fill:#8f8,stroke:#333
+    style SYSTEM fill:#ff8,stroke:#333
+```
+
+### Advantages
+
+| Benefit | Description |
+|---------|-------------|
+| **🛡️ Consistent Ad Blocking** | Ads blocked on all networks (home, office, mobile data) |
+| **🔒 DNS Privacy** | All DNS encrypted via DoH to upstream, ISP can't see queries |
+| **📊 Complete Visibility** | View all DNS queries in one AdGuard dashboard |
+| **⚡ Performance** | Faster responses due to caching (after initial query) |
+| **🎯 Centralized Control** | Update blocklists once, affects all devices |
+| **🏠 Works Everywhere** | No need to configure DNS per network |
+
+### Disadvantages
+
+| Risk | Description | Mitigation |
+|------|-------------|------------|
+| **❌ Single Point of Failure** | If AdGuard is down, all DNS fails | Configure fallback DNS servers |
+| **🐌 Latency (Initial)** | Queries travel through VPN tunnel | Enable DNS caching |
+| **🔌 Requires VPN** | Must maintain NetBird connection | Use system DNS as fallback |
+| **🚫 Network Dependency** | Unreachable if NetBird server is down | Automatic fallback to local DNS |
+| **⚠️ Bypasses Local DNS** | Can't resolve LAN devices (.local) | Use split DNS configuration |
+| **🔧 Troubleshooting Complexity** | DNS issues harder to diagnose | Keep reverting instructions handy |
+
+### Configuration by Operating System
+
+#### Linux (Ubuntu/Debian with systemd-resolved)
+
+**Method 1: Global Configuration (Recommended)**
+
+```bash
+# Create configuration file
+sudo tee /etc/systemd/resolved.conf.d/netbird-adguard.conf << 'EOF'
+[Resolve]
+DNS=100.126.106.20
+FallbackDNS=1.1.1.1 8.8.8.8
+Domains=~.
+DNSOverTLS=no
+DNSSEC=no
+Cache=yes
+EOF
+
+# Restart resolver
+sudo systemctl restart systemd-resolved
+
+# Verify
+resolvectl status
+```
+
+**Expected Output:**
+```
+Global:
+  DNS Servers: 100.126.106.20
+  Fallback DNS Servers: 1.1.1.1, 8.8.8.8
+  DNS Domain: ~.
+```
+
+**Method 2: Network Manager**
+
+```bash
+# Create NetworkManager configuration
+sudo tee /etc/NetworkManager/conf.d/dns.conf << 'EOF'
+[main]
+dns=none
+systemd-resolved=false
+EOF
+
+# Create resolv.conf
+sudo tee /etc/resolv.conf << 'EOF'
+nameserver 100.126.106.20
+nameserver 1.1.1.1
+options timeout:2
+EOF
+
+# Make immutable to prevent overwrites
+sudo chattr +i /etc/resolv.conf
+
+# Restart NetworkManager
+sudo systemctl restart NetworkManager
+```
+
+#### macOS
+
+**Configuration:**
+
+```bash
+# Get your primary network interface
+networksetup -listallnetworkservices
+
+# Set DNS for Wi-Fi (adjust interface name)
+sudo networksetup -setdnsservers Wi-Fi 100.126.106.20 1.1.1.1
+
+# Verify
+scutil --dns | grep nameserver
+```
+
+**Alternative: GUI Method**
+
+1. Open **System Settings** → **Network**
+2. Select your connection (Wi-Fi or Ethernet)
+3. Click **Details**
+4. Select **DNS** tab
+5. Click **+** and add:
+   - Primary: `100.126.106.20`
+   - Secondary: `1.1.1.1`
+6. Click **OK**
+
+#### Windows
+
+**Method 1: PowerShell (Admin)**
+
+```powershell
+# Get your network adapter name
+Get-NetAdapter
+
+# Set DNS (replace "Ethernet" with your adapter name)
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses ("100.126.106.20","1.1.1.1")
+
+# Verify
+Get-DnsClientServerAddress
+```
+
+**Method 2: GUI**
+
+1. Open **Settings** → **Network & Internet**
+2. Click **Change adapter options**
+3. Right-click your connection → **Properties**
+4. Select **Internet Protocol Version 4 (TCP/IPv4)**
+5. Click **Properties**
+6. Select **Use the following DNS server addresses**
+7. Enter:
+   - Preferred: `100.126.106.20`
+   - Alternate: `1.1.1.1`
+8. Click **OK**
+
+#### Android
+
+> **Note:** Requires NetBird app with "Always-on VPN" enabled.
+
+**Configuration:**
+
+1. Open **Settings** → **Network & Internet** → **VPN**
+2. Tap **⚙️** next to NetBird
+3. Enable **Always-on VPN**
+4. Enable **Block connections without VPN** (optional but recommended)
+
+**Private DNS (DoT - Alternative):**
+
+1. **Settings** → **Network & Internet** → **Private DNS**
+2. Select **Private DNS provider hostname**
+3. Enter: `dns.adguard.com` (public AdGuard DNS)
+   - ⚠️ This uses public AdGuard, not your private instance
+
+#### iOS/iPadOS
+
+**VPN-Always-On (Supervised Devices Only):**
+
+For personal devices, NetBird DNS only works when VPN is connected. iOS doesn't support system-wide DNS override without MDM.
+
+**Alternative: DNS Profile**
+
+1. Install NetBird app
+2. Enable **Connect on Demand**
+3. DNS applies automatically when VPN connects
+
+### Testing System-Wide Configuration
+
+**Verification Script:**
+
+```bash
+#!/bin/bash
+
+echo "=========================================="
+echo "System-Wide DNS Configuration Test"
+echo "=========================================="
+echo ""
+
+echo "1. Current DNS Servers"
+echo "----------------------"
+if command -v resolvectl &> /dev/null; then
+    resolvectl status | grep "DNS Servers"
+elif command -v scutil &> /dev/null; then
+    scutil --dns | grep nameserver | head -2
+else
+    cat /etc/resolv.conf | grep nameserver
+fi
+echo ""
+
+echo "2. DNS Resolution Test"
+echo "----------------------"
+echo "google.com:"
+dig google.com +short | head -1
+
+echo ""
+echo "3. Ad Blocking Test"
+echo "-------------------"
+BLOCKED=$(dig doubleclick.net +short)
+if [[ "$BLOCKED" == "0.0.0.0" ]] || [[ -z "$BLOCKED" ]]; then
+    echo "✅ Ads are being blocked!"
+else
+    echo "❌ Ads NOT blocked (got: $BLOCKED)"
+fi
+
+echo ""
+echo "4. DNS Server Used"
+echo "------------------"
+dig google.com | grep SERVER:
+
+echo ""
+echo "=========================================="
+```
+
+### Reverting to Default DNS
+
+#### Linux (systemd-resolved)
+
+```bash
+# Remove custom configuration
+sudo rm /etc/systemd/resolved.conf.d/netbird-adguard.conf
+
+# Restart resolver
+sudo systemctl restart systemd-resolved
+
+# Verify
+resolvectl status
+```
+
+**If you made `/etc/resolv.conf` immutable:**
+
+```bash
+# Remove immutable flag
+sudo chattr -i /etc/resolv.conf
+
+# Restore systemd link
+sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+# Restart NetworkManager
+sudo systemctl restart NetworkManager
+```
+
+#### macOS
+
+```bash
+# Clear DNS settings (use your interface name)
+sudo networksetup -setdnsservers Wi-Fi Empty
+
+# This reverts to DHCP-provided DNS
+```
+
+**GUI Method:**
+
+1. **System Settings** → **Network** → Select connection
+2. **Details** → **DNS**
+3. Select all DNS servers and click **-** (remove)
+4. Click **OK**
+
+#### Windows
+
+**PowerShell:**
+
+```powershell
+# Reset to automatic (DHCP)
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ResetServerAddresses
+```
+
+**GUI:**
+
+1. Network adapter **Properties**
+2. **Internet Protocol Version 4 (TCP/IPv4)** → **Properties**
+3. Select **Obtain DNS server address automatically**
+4. Click **OK**
+
+#### Android
+
+1. **Settings** → **Network & Internet** → **VPN**
+2. Tap **⚙️** next to NetBird
+3. Disable **Always-on VPN**
+
+#### iOS
+
+1. Open **Settings** → **VPN**
+2. Toggle off NetBird VPN when not needed
+
+### Hybrid Approach: Conditional DNS
+
+**Use case:** Route only specific domains through AdGuard, others use default DNS.
+
+**Linux with dnsmasq:**
+
+```bash
+# Install dnsmasq
+sudo apt install dnsmasq
+
+# Configure
+sudo tee /etc/dnsmasq.conf << 'EOF'
+# Forward specific domains to AdGuard
+server=/internal.company.com/100.126.106.20
+server=/vpc.local/100.126.106.20
+
+# All other domains use default
+server=1.1.1.1
+server=8.8.8.8
+
+# Enable caching
+cache-size=1000
+EOF
+
+# Start dnsmasq
+sudo systemctl enable --now dnsmasq
+
+# Point resolver to dnsmasq
+sudo tee /etc/systemd/resolved.conf.d/dnsmasq.conf << 'EOF'
+[Resolve]
+DNS=127.0.0.1
+DNSStubListener=no
+EOF
+
+sudo systemctl restart systemd-resolved
+```
+
+### Best Practices
+
+**✅ Recommended Configuration:**
+
+```yaml
+Primary DNS: 100.126.106.20     # Your AdGuard instance
+Fallback DNS: 1.1.1.1, 8.8.8.8  # Public DNS (if AdGuard fails)
+Search Domains: ~.              # Route all domains through AdGuard
+Timeout: 2 seconds              # Fail fast if AdGuard is down
+```
+
+**✅ Do:**
+- Always configure fallback DNS
+- Test before deploying to production devices
+- Keep reverting instructions documented
+- Monitor AdGuard uptime
+- Enable DNS caching
+
+**❌ Don't:**
+- Use system-wide DNS without fallback
+- Configure on mission-critical systems without testing
+- Forget to document the change
+- Use if NetBird connection is unstable
+- Override local network DNS resolution without split DNS
+
+### Troubleshooting System-Wide DNS
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **All DNS fails** | AdGuard unreachable, no fallback | Add fallback DNS servers |
+| **Slow DNS responses** | VPN tunnel latency | Enable local DNS caching |
+| **Can't resolve local devices** | All queries go to AdGuard | Configure split DNS or DNS rewrites |
+| **DNS leaks** | System ignoring custom DNS | Make `/etc/resolv.conf` immutable (Linux) |
+| **Changes don't persist** | DHCP/NetworkManager overwriting | Use systemd-resolved drop-ins |
+
+---
+
 ## Security Considerations
+
+> **🔒 Security Overview**  
+> This section covers security best practices for the AdGuard + NetBird deployment, including network segmentation, firewall configuration, encryption, privacy, and access control.
 
 ### Network Segmentation
 
