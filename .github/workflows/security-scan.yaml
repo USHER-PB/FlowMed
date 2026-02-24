@@ -29,7 +29,7 @@ jobs:
   # =============================================================================
   tfsec:
     name: Terraform Security
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -46,7 +46,7 @@ jobs:
   # =============================================================================
   trivy:
     name: Trivy IaC Scan
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -66,7 +66,7 @@ jobs:
   # =============================================================================
   checkov:
     name: Checkov IaC Analysis
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -85,7 +85,7 @@ jobs:
   # =============================================================================
   secrets:
     name: Secret Detection
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -108,7 +108,7 @@ jobs:
   # =============================================================================
   helm-security:
     name: Helm Security
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -135,7 +135,7 @@ jobs:
   # =============================================================================
   opa:
     name: OPA Policy Check
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -160,7 +160,7 @@ jobs:
   # =============================================================================
   summary:
     name: Security Summary
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: [tfsec, trivy, checkov, secrets, helm-security, opa]
     if: always()
 

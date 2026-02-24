@@ -34,7 +34,7 @@ jobs:
   # =============================================================================
   validate-title:
     name: Validate PR Title
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Check PR Title
@@ -68,7 +68,7 @@ jobs:
   # =============================================================================
   required-checks:
     name: Required Checks
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: [validate-title]
 
     steps:
@@ -112,7 +112,7 @@ jobs:
   # =============================================================================
   pr-checklist:
     name: PR Checklist
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -200,7 +200,7 @@ jobs:
   # =============================================================================
   labeler:
     name: Label PR
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -249,7 +249,7 @@ jobs:
   # =============================================================================
   gate:
     name: PR Gate
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: [validate-title, required-checks, pr-checklist]
     if: always()
 

@@ -53,7 +53,7 @@ jobs:
   # =============================================================================
   validate:
     name: Validate
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout
@@ -83,7 +83,7 @@ jobs:
   # =============================================================================
   security:
     name: Security Scan
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: validate
 
     steps:
@@ -101,7 +101,7 @@ jobs:
   # =============================================================================
   plan-validate:
     name: Plan Validation
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: [validate, security]
 
     steps:
@@ -162,7 +162,7 @@ jobs:
   # =============================================================================
   plan:
     name: Plan (${{ matrix.environment }})
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     needs: [validate, security]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && vars.ENABLE_AWS_PLAN == 'true')
 
