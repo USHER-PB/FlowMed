@@ -7,64 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- n8n workflow automation for approvals, onboarding, and alerting
-- Event-driven architecture with webhook handlers and scheduled triggers
-- ArgoCD notification handlers for deployment events
-- SECURITY.md with security policies and guidelines
-- CODEOWNERS for automated review assignments
-- Dependabot configuration for automated dependency updates
-- Pre-commit hooks for security and quality checks
-- Branch protection setup script
-
-### Changed
-
-- Updated README with n8n architecture diagram
-- Added Event-Driven Architecture diagram to documentation
-- Enhanced technology stack documentation
-
-## [0.2.0] - 2024-XX-XX
+## [0.0.0] - 2024-02-24
 
 ### Added
 
-- Backstage self-service portal architecture
+#### Infrastructure as Code
+- Terraform modules for AWS EKS cluster provisioning
+- Terraform modules for VPC and networking (subnets, NAT, VPC endpoints)
+- Environment-specific configurations (dev, staging, prod)
+
+#### GitOps & Deployments
+- ArgoCD bootstrap configuration with App of Apps pattern
+- ApplicationSets for automatic team app generation
+- Helm base-app chart for standardized deployments
+
+#### Multi-Tenancy
+- Tenant Custom Resource Definition (CRD)
+- Resource quota tiers (starter, standard, enterprise)
+- Namespace provisioning per environment
+
+#### Service Catalog
+- PostgreSQL managed service (CloudNativePG)
+- Redis managed service (Redis Operator)
+- RabbitMQ managed service (RabbitMQ Operator)
+
+#### Self-Service Portal
+- Backstage architecture and configuration
 - Software templates for new applications
 - Service catalog integration
-- Team onboarding templates
 
-### Changed
+#### Workflow Automation
+- n8n deployment for workflow automation
+- Production deployment approval workflows
+- Team onboarding automation
+- Critical alert handling with PagerDuty integration
+- Event-driven architecture with webhooks and schedules
 
-- Updated README with multi-tenant architecture
-- Enhanced project structure documentation
-
-## [0.1.0] - 2024-XX-XX
-
-### Added
-
-- Initial project structure
-- Terraform modules for EKS and networking
-- ArgoCD bootstrap configuration with App of Apps pattern
-- Helm base-app chart for standardized deployments
-- Multi-tenant support with Tenant CRD
-- Resource quota tiers (starter, standard, enterprise)
-- Service catalog with PostgreSQL, Redis, RabbitMQ offerings
-- OPA Gatekeeper policies for security compliance
+#### Security
+- OPA Gatekeeper policies for compliance
 - Network policies for pod isolation
 - RBAC configuration for platform roles
-- Prometheus, Grafana, Alertmanager monitoring stack
-- GitHub Actions CI/CD pipelines
-- Comprehensive documentation
-
-### Security
-
 - TLS automation with cert-manager
-- Secret detection in CI/CD
+- Secret detection with Gitleaks
 - Container image scanning with Trivy
-- Network isolation with Network Policies
+
+#### Observability
+- Prometheus for metrics collection
+- Grafana dashboards
+- Alertmanager for alerting
+
+#### Networking
 - NetBird VPN integration
 - AdGuard DNS filtering
 
-[Unreleased]: https://github.com/skyengpro/om/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/skyengpro/om/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/skyengpro/om/releases/tag/v0.1.0
+#### CI/CD
+- GitHub Actions workflows for Terraform
+- Helm chart linting and validation
+- Security scanning pipelines
+- Release automation with Release Please
+
+#### Documentation
+- Getting started guide
+- Architecture documentation
+- Customization guide
+- Operational runbooks
+- ADR (Architecture Decision Records)
+- Security policy (SECURITY.md)
+- Contributing guidelines
+
+#### Repository Configuration
+- CODEOWNERS for review requirements
+- Dependabot for dependency updates
+- Pre-commit hooks for code quality
+- Branch protection setup script
+
+[Unreleased]: https://github.com/skyengpro/om/compare/v0.0.0...HEAD
+[0.0.0]: https://github.com/skyengpro/om/releases/tag/v0.0.0
