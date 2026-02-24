@@ -2,6 +2,7 @@
 # ArgoCD Application Sync
 # =============================================================================
 # This workflow triggers ArgoCD sync for applications after changes.
+# Requires ARGOCD_SERVER, ARGOCD_USERNAME, ARGOCD_PASSWORD secrets.
 # =============================================================================
 
 name: ArgoCD Sync
@@ -25,18 +26,96 @@ on:
         default: '--prune'
         type: string
 
-env:
-  ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
-
 permissions:
   contents: read
 
 jobs:
-  detect-changes:
-    name: Detect Changed Applications
+  # =============================================================================
+  # Check Prerequisites
+  # =============================================================================
+  check-config:
+    name: Check Configuration
     runs-on: ubuntu-latest
     outputs:
+      configured: ${{ steps.check.outputs.configured }}
+
+    steps:
+      - name: Check ArgoCD Configuration
+        id: check
+        run: |
+          if [ -n "${{ secrets.ARGOCD_SERVER }}" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "ArgoCD is configured"
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning::ArgoCD secrets not configured. Skipping sync."
+            echo "## ArgoCD Not Configured" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To enable ArgoCD sync, configure these repository secrets:" >> $GITHUB_STEP_SUMMARY
+            echo "- \`ARGOCD_SERVER\`: ArgoCD server URL" >> $GITHUB_STEP_SUMMARY
+            echo "- \`ARGOCD_USERNAME\`: ArgoCD username" >> $GITHUB_STEP_SUMMARY
+            echo "- \`ARGOCD_PASSWORD\`: ArgoCD password" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # =============================================================================
+  # Validate ArgoCD Manifests
+  # =============================================================================
+  validate:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Validate ArgoCD Applications
+        run: |
+          echo "## ArgoCD Application Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          errors=0
+          for file in argocd/apps/**/*.yaml argocd/applicationsets/*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Validating $file..."
+              if ! yq e '.' "$file" > /dev/null 2>&1; then
+                echo "::error file=$file::Invalid YAML syntax"
+                errors=$((errors + 1))
+              fi
+            fi
+          done
+
+          if [ $errors -eq 0 ]; then
+            echo "All ArgoCD manifests are valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Found $errors validation errors" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Validate Helm Charts
+        run: |
+          for chart in helm/charts/*/; do
+            if [ -f "${chart}Chart.yaml" ]; then
+              echo "Linting $chart..."
+              helm lint "$chart" || true
+            fi
+          done
+
+  # =============================================================================
+  # Detect Changed Applications
+  # =============================================================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    needs: [check-config, validate]
+    if: needs.check-config.outputs.configured == 'true'
+    outputs:
       applications: ${{ steps.changes.outputs.applications }}
+      has_changes: ${{ steps.changes.outputs.has_changes }}
 
     steps:
       - name: Checkout
@@ -50,44 +129,59 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ -n "${{ github.event.inputs.application }}" ]]; then
               echo "applications=[\"${{ github.event.inputs.application }}\"]" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
             else
-              # Get all applications
-              apps=$(ls argocd/apps/*.yaml 2>/dev/null | xargs -I{} basename {} .yaml | jq -R . | jq -s .)
-              echo "applications=$apps" >> $GITHUB_OUTPUT
+              # Get all applications from argocd/apps directories
+              apps=$(find argocd/apps -name "*.yaml" -type f 2>/dev/null | xargs -I{} basename {} .yaml | sort -u | jq -R . | jq -s . || echo "[]")
+              if [ "$apps" != "[]" ]; then
+                echo "applications=$apps" >> $GITHUB_OUTPUT
+                echo "has_changes=true" >> $GITHUB_OUTPUT
+              else
+                echo "applications=[]" >> $GITHUB_OUTPUT
+                echo "has_changes=false" >> $GITHUB_OUTPUT
+              fi
             fi
           else
             # Detect changed files
-            changed_files=$(git diff --name-only HEAD^ HEAD)
+            changed_files=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "")
             apps="[]"
 
             # Check ArgoCD app definitions
             for file in $changed_files; do
-              if [[ $file == argocd/apps/*.yaml ]]; then
+              if [[ $file == argocd/apps/*.yaml ]] || [[ $file == argocd/apps/**/*.yaml ]]; then
                 app=$(basename "$file" .yaml)
-                apps=$(echo "$apps" | jq --arg app "$app" '. + [$app]')
+                apps=$(echo "$apps" | jq --arg app "$app" '. + [$app]' | jq 'unique')
               fi
             done
 
-            # If helm charts changed, sync all apps using them
+            # If helm charts changed, we should note it
             if echo "$changed_files" | grep -q "^helm/"; then
-              # Add all applications (they might use the changed charts)
-              all_apps=$(ls argocd/apps/*.yaml 2>/dev/null | xargs -I{} basename {} .yaml | jq -R . | jq -s .)
-              apps=$all_apps
+              echo "::notice::Helm charts changed - consider syncing affected applications"
             fi
 
-            echo "applications=$apps" >> $GITHUB_OUTPUT
+            if [ "$apps" != "[]" ]; then
+              echo "applications=$apps" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "applications=[]" >> $GITHUB_OUTPUT
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
+  # =============================================================================
+  # Sync Applications
+  # =============================================================================
   sync:
-    name: Sync Application
+    name: Sync
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.applications != '[]'
+    needs: [check-config, detect-changes]
+    if: needs.check-config.outputs.configured == 'true' && needs.detect-changes.outputs.has_changes == 'true'
 
     strategy:
       matrix:
         application: ${{ fromJson(needs.detect-changes.outputs.applications) }}
       fail-fast: false
+      max-parallel: 3
 
     steps:
       - name: Checkout
@@ -101,20 +195,30 @@ jobs:
 
       - name: ArgoCD Login
         run: |
-          argocd login ${{ env.ARGOCD_SERVER }} \
-            --username ${{ secrets.ARGOCD_USERNAME }} \
-            --password ${{ secrets.ARGOCD_PASSWORD }} \
+          argocd login "${{ secrets.ARGOCD_SERVER }}" \
+            --username "${{ secrets.ARGOCD_USERNAME }}" \
+            --password "${{ secrets.ARGOCD_PASSWORD }}" \
+            --grpc-web \
             --insecure
 
       - name: Sync Application
         run: |
           echo "Syncing application: ${{ matrix.application }}"
-          argocd app sync ${{ matrix.application }} \
+          argocd app sync "${{ matrix.application }}" \
             ${{ github.event.inputs.sync_options || '--prune' }} \
-            --timeout 300
+            --timeout 300 \
+            --grpc-web
 
       - name: Wait for Health
         run: |
-          argocd app wait ${{ matrix.application }} \
+          argocd app wait "${{ matrix.application }}" \
             --health \
-            --timeout 600
+            --timeout 600 \
+            --grpc-web
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Sync: ${{ matrix.application }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          argocd app get "${{ matrix.application }}" --grpc-web || true
