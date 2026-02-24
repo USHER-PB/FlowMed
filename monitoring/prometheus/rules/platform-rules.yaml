@@ -1,0 +1,118 @@
+# =============================================================================
+# Platform Prometheus Recording Rules
+# =============================================================================
+# Recording rules for pre-computing frequently used metrics.
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    prometheus: platform
+spec:
+  groups:
+    # ==========================================================================
+    # Application Performance Rules
+    # ==========================================================================
+    - name: application.rules
+      interval: 30s
+      rules:
+        # Request rate per application
+        - record: application:http_requests:rate5m
+          expr: |
+            sum by (namespace, app) (
+              rate(http_requests_total[5m])
+            )
+
+        # Error rate per application
+        - record: application:http_errors:rate5m
+          expr: |
+            sum by (namespace, app) (
+              rate(http_requests_total{status=~"5.."}[5m])
+            )
+
+        # Request latency percentiles
+        - record: application:http_request_duration_seconds:p50
+          expr: |
+            histogram_quantile(0.50,
+              sum by (namespace, app, le) (
+                rate(http_request_duration_seconds_bucket[5m])
+              )
+            )
+
+        - record: application:http_request_duration_seconds:p95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (namespace, app, le) (
+                rate(http_request_duration_seconds_bucket[5m])
+              )
+            )
+
+        - record: application:http_request_duration_seconds:p99
+          expr: |
+            histogram_quantile(0.99,
+              sum by (namespace, app, le) (
+                rate(http_request_duration_seconds_bucket[5m])
+              )
+            )
+
+    # ==========================================================================
+    # Resource Utilization Rules
+    # ==========================================================================
+    - name: resource.rules
+      interval: 30s
+      rules:
+        # CPU utilization per namespace
+        - record: namespace:cpu_usage:sum
+          expr: |
+            sum by (namespace) (
+              rate(container_cpu_usage_seconds_total{container!=""}[5m])
+            )
+
+        # Memory utilization per namespace
+        - record: namespace:memory_usage:sum
+          expr: |
+            sum by (namespace) (
+              container_memory_working_set_bytes{container!=""}
+            )
+
+        # CPU request utilization
+        - record: namespace:cpu_request_utilization:ratio
+          expr: |
+            namespace:cpu_usage:sum /
+            sum by (namespace) (kube_pod_container_resource_requests{resource="cpu"})
+
+        # Memory request utilization
+        - record: namespace:memory_request_utilization:ratio
+          expr: |
+            namespace:memory_usage:sum /
+            sum by (namespace) (kube_pod_container_resource_requests{resource="memory"})
+
+    # ==========================================================================
+    # SLI Rules
+    # ==========================================================================
+    - name: sli.rules
+      interval: 30s
+      rules:
+        # Availability SLI (successful requests / total requests)
+        - record: sli:availability:ratio5m
+          expr: |
+            sum by (namespace, app) (
+              rate(http_requests_total{status!~"5.."}[5m])
+            ) /
+            sum by (namespace, app) (
+              rate(http_requests_total[5m])
+            )
+
+        # Latency SLI (requests under threshold / total requests)
+        - record: sli:latency:ratio5m
+          expr: |
+            sum by (namespace, app) (
+              rate(http_request_duration_seconds_bucket{le="0.5"}[5m])
+            ) /
+            sum by (namespace, app) (
+              rate(http_request_duration_seconds_count[5m])
+            )

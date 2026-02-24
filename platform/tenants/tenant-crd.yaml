@@ -1,0 +1,311 @@
+# =============================================================================
+# Tenant Custom Resource Definition
+# =============================================================================
+# Defines the Tenant CRD for managing team subscriptions to the platform.
+# A Tenant represents a team's subscription with quotas, permissions, and
+# access to platform services.
+# =============================================================================
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenants.platform.om.io
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  group: platform.om.io
+  names:
+    kind: Tenant
+    listKind: TenantList
+    plural: tenants
+    singular: tenant
+    shortNames:
+      - tn
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - name
+                - owner
+                - tier
+              properties:
+                # Team name (used for namespace prefix)
+                name:
+                  type: string
+                  pattern: "^[a-z][a-z0-9-]{1,20}$"
+                  description: "Team name (lowercase, alphanumeric with hyphens)"
+
+                # Team display name
+                displayName:
+                  type: string
+                  description: "Human-readable team name"
+
+                # Team description
+                description:
+                  type: string
+                  description: "Team description and purpose"
+
+                # Team owner (email)
+                owner:
+                  type: string
+                  format: email
+                  description: "Team owner email address"
+
+                # Subscription tier
+                tier:
+                  type: string
+                  enum:
+                    - starter
+                    - standard
+                    - enterprise
+                  description: "Resource quota tier"
+
+                # Environments this tenant has access to
+                environments:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - dev
+                      - staging
+                      - prod
+                  default:
+                    - dev
+
+                # Cost center for billing
+                costCenter:
+                  type: string
+                  description: "Cost center code for billing"
+
+                # Contact channels
+                contacts:
+                  type: object
+                  properties:
+                    slack:
+                      type: string
+                      description: "Slack channel for notifications"
+                    email:
+                      type: string
+                      format: email
+                      description: "Team email distribution list"
+                    oncall:
+                      type: string
+                      description: "On-call rotation or PagerDuty service"
+
+                # Team members with roles
+                members:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - email
+                      - role
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                      role:
+                        type: string
+                        enum:
+                          - admin
+                          - developer
+                          - viewer
+
+                # Enabled platform services
+                services:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        enum:
+                          - postgresql
+                          - redis
+                          - rabbitmq
+                          - elasticsearch
+                          - mongodb
+                          - kafka
+                      size:
+                        type: string
+                        enum:
+                          - small
+                          - medium
+                          - large
+                        default: small
+
+                # Network policies
+                networkPolicy:
+                  type: object
+                  properties:
+                    allowInternetEgress:
+                      type: boolean
+                      default: true
+                    allowedNamespaces:
+                      type: array
+                      items:
+                        type: string
+
+                # Custom labels to apply
+                labels:
+                  type: object
+                  additionalProperties:
+                    type: string
+
+                # Custom annotations
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Provisioning
+                    - Active
+                    - Suspended
+                    - Deleting
+                namespaces:
+                  type: array
+                  items:
+                    type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                resourceUsage:
+                  type: object
+                  properties:
+                    cpuUsed:
+                      type: string
+                    memoryUsed:
+                      type: string
+                    storageUsed:
+                      type: string
+                    podsRunning:
+                      type: integer
+
+      subresources:
+        status: {}
+
+      additionalPrinterColumns:
+        - name: Tier
+          type: string
+          jsonPath: .spec.tier
+        - name: Owner
+          type: string
+          jsonPath: .spec.owner
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Namespaces
+          type: string
+          jsonPath: .status.namespaces
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+
+---
+# =============================================================================
+# Example Tenant Resources
+# =============================================================================
+
+# Example: Backend Team
+apiVersion: platform.om.io/v1alpha1
+kind: Tenant
+metadata:
+  name: backend
+spec:
+  name: backend
+  displayName: "Backend Engineering"
+  description: "Core backend services and APIs"
+  owner: backend-lead@example.com
+  tier: standard
+  environments:
+    - dev
+    - staging
+    - prod
+  costCenter: "ENG-001"
+  contacts:
+    slack: "#team-backend"
+    email: backend-team@example.com
+    oncall: "backend-oncall"
+  members:
+    - email: john.doe@example.com
+      role: admin
+    - email: jane.smith@example.com
+      role: developer
+    - email: bob.wilson@example.com
+      role: developer
+  services:
+    - name: postgresql
+      size: medium
+    - name: redis
+      size: small
+  networkPolicy:
+    allowInternetEgress: true
+    allowedNamespaces:
+      - frontend
+      - data
+  labels:
+    business-unit: engineering
+    data-classification: internal
+
+---
+# Example: Frontend Team
+apiVersion: platform.om.io/v1alpha1
+kind: Tenant
+metadata:
+  name: frontend
+spec:
+  name: frontend
+  displayName: "Frontend Engineering"
+  description: "Web and mobile frontend applications"
+  owner: frontend-lead@example.com
+  tier: starter
+  environments:
+    - dev
+    - staging
+  costCenter: "ENG-002"
+  contacts:
+    slack: "#team-frontend"
+    email: frontend-team@example.com
+  members:
+    - email: alice.johnson@example.com
+      role: admin
+    - email: charlie.brown@example.com
+      role: developer
+  services:
+    - name: redis
+      size: small
+  labels:
+    business-unit: engineering
+    data-classification: public

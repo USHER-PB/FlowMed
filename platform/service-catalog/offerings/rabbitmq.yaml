@@ -1,0 +1,121 @@
+# =============================================================================
+# RabbitMQ Service Offering
+# =============================================================================
+# Managed RabbitMQ message broker using RabbitMQ Cluster Operator.
+# =============================================================================
+
+apiVersion: platform.om.io/v1alpha1
+kind: ServiceOffering
+metadata:
+  name: rabbitmq
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    service-catalog/category: messaging
+spec:
+  name: rabbitmq
+  displayName: "RabbitMQ Message Broker"
+  description: |
+    Managed RabbitMQ message broker for reliable
+    asynchronous messaging and task queues.
+  category: messaging
+  icon: "https://www.rabbitmq.com/img/rabbitmq-logo.svg"
+
+  versions:
+    - "3.12"
+    - "3.11"
+  defaultVersion: "3.12"
+
+  sizes:
+    small:
+      displayName: "Small"
+      description: "Development and testing"
+      resources:
+        cpu: 500m
+        memory: 1Gi
+      storage: 10Gi
+      replicas: 1
+      estimatedCost: "$50/month"
+
+    medium:
+      displayName: "Medium"
+      description: "Production messaging"
+      resources:
+        cpu: 1
+        memory: 2Gi
+      storage: 50Gi
+      replicas: 3
+      estimatedCost: "$200/month"
+
+    large:
+      displayName: "Large"
+      description: "High-throughput production"
+      resources:
+        cpu: 2
+        memory: 4Gi
+      storage: 100Gi
+      replicas: 5
+      estimatedCost: "$500/month"
+
+  environmentRestrictions:
+    dev:
+      allowedSizes: ["small"]
+    staging:
+      allowedSizes: ["small", "medium"]
+    prod:
+      allowedSizes: ["medium", "large"]
+      requireApproval: true
+
+  requiredTier: standard
+
+  provisionTemplate: |
+    apiVersion: rabbitmq.com/v1beta1
+    kind: RabbitmqCluster
+    metadata:
+      name: {{ .request.name }}
+      namespace: {{ .request.namespace }}
+      labels:
+        app.kubernetes.io/part-of: om-platform
+        platform.om.io/tenant: {{ .tenant.name }}
+        platform.om.io/service: rabbitmq
+    spec:
+      replicas: {{ .size.replicas }}
+
+      image: rabbitmq:{{ .config.version | default "3.12" }}-management
+
+      resources:
+        requests:
+          cpu: {{ .size.resources.cpu }}
+          memory: {{ .size.resources.memory }}
+        limits:
+          cpu: {{ .size.resources.cpu }}
+          memory: {{ .size.resources.memory }}
+
+      persistence:
+        storageClassName: gp3
+        storage: {{ .size.storage }}
+
+      rabbitmq:
+        additionalConfig: |
+          vm_memory_high_watermark.relative = 0.8
+          disk_free_limit.relative = 1.5
+
+      override:
+        statefulSet:
+          spec:
+            template:
+              spec:
+                topologySpreadConstraints:
+                  - maxSkew: 1
+                    topologyKey: topology.kubernetes.io/zone
+                    whenUnsatisfied: ScheduleAnyway
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: {{ .request.name }}
+
+  connectionTemplate: |
+    host: {{ .request.name }}.{{ .request.namespace }}.svc.cluster.local
+    port: 5672
+    managementPort: 15672
+    secretName: {{ .request.name }}-default-user
+
+  cleanupPolicy: Delete

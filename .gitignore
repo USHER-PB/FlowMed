@@ -39,3 +39,9 @@ terraform.rc
 ## Ignore prompts directory which may contain sensitive data or be used for local testing
 prompts/
 ./pompts/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo

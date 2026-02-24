@@ -1,0 +1,164 @@
+# =============================================================================
+# Security Scanning Pipeline
+# =============================================================================
+# This workflow runs security scans on infrastructure code and dependencies.
+# =============================================================================
+
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run weekly on Sundays
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # =============================================================================
+  # Terraform Security Scan
+  # =============================================================================
+  tfsec:
+    name: Terraform Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+          format: sarif
+          out: tfsec.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+
+  # =============================================================================
+  # Kubernetes Manifests Security Scan
+  # =============================================================================
+  kubesec:
+    name: Kubernetes Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Template Helm Charts
+        run: |
+          mkdir -p /tmp/manifests
+          for chart in helm/charts/*/; do
+            name=$(basename "$chart")
+            helm template test "$chart" > "/tmp/manifests/${name}.yaml" 2>/dev/null || true
+          done
+
+      - name: Run Kubesec
+        uses: controlplaneio/kubesec-action@v0.0.2
+        with:
+          input: /tmp/manifests/
+          format: sarif
+          output: kubesec.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: kubesec.sarif
+        continue-on-error: true
+
+  # =============================================================================
+  # Trivy Vulnerability Scan
+  # =============================================================================
+  trivy:
+    name: Trivy IaC Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  # =============================================================================
+  # Checkov Security Scan
+  # =============================================================================
+  checkov:
+    name: Checkov IaC Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,kubernetes,helm
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
+  # =============================================================================
+  # OPA Policy Validation
+  # =============================================================================
+  opa:
+    name: OPA Policy Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Validate OPA Policies
+        run: |
+          if [ -d "security/opa-policies" ]; then
+            for policy in security/opa-policies/*.rego; do
+              echo "Checking $policy..."
+              opa check "$policy"
+            done
+          fi
+
+      - name: Test OPA Policies
+        run: |
+          if [ -d "security/opa-policies" ] && [ -d "security/opa-policies/tests" ]; then
+            opa test security/opa-policies/ -v
+          fi

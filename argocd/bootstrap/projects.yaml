@@ -1,0 +1,182 @@
+# =============================================================================
+# ArgoCD Projects
+# =============================================================================
+# Define ArgoCD projects for different teams and purposes.
+# =============================================================================
+
+# Platform Project - For infrastructure and platform components
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  description: Platform infrastructure and core components
+
+  sourceRepos:
+    - https://github.com/skyengpro/om.git
+    - https://charts.jetstack.io
+    - https://prometheus-community.github.io/helm-charts
+    - https://argoproj.github.io/argo-helm
+
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  orphanedResources:
+    warn: true
+
+---
+# Team Template Project - Copy and customize for each team
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-template
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  description: Template project for team onboarding (copy and customize)
+
+  sourceRepos:
+    - https://github.com/skyengpro/om.git
+
+  destinations:
+    # Replace team-namespace with actual team namespace
+    - namespace: team-namespace
+      server: https://kubernetes.default.svc
+
+  # Cluster resources teams can create
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Namespace resources teams can manage
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: DaemonSet
+    - group: batch
+      kind: Job
+    - group: batch
+      kind: CronJob
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+    - group: monitoring.coreos.com
+      kind: PodMonitor
+
+  # Deny certain namespaces
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+
+  orphanedResources:
+    warn: true
+
+---
+# Development Environment Project
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: development
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    environment: development
+spec:
+  description: Development environment applications
+
+  sourceRepos:
+    - https://github.com/skyengpro/om.git
+    - '*'  # Allow any repo in dev
+
+  destinations:
+    - namespace: '*-dev'
+      server: https://kubernetes.default.svc
+    - namespace: dev-*
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  orphanedResources:
+    warn: false  # Less strict in dev
+
+---
+# Production Environment Project
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    environment: production
+spec:
+  description: Production environment applications (restricted)
+
+  sourceRepos:
+    - https://github.com/skyengpro/om.git
+
+  destinations:
+    - namespace: '*-prod'
+      server: https://kubernetes.default.svc
+    - namespace: prod-*
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Require manual sync in production
+  syncWindows:
+    - kind: allow
+      schedule: "0 6-18 * * 1-5"  # Weekdays 6 AM - 6 PM
+      duration: 12h
+      applications:
+        - '*'
+
+  orphanedResources:
+    warn: true

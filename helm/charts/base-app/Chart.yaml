@@ -1,0 +1,26 @@
+apiVersion: v2
+name: base-app
+description: |
+  A standardized Helm chart for deploying applications on the OM Platform.
+  This chart provides a consistent deployment pattern for all teams.
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - application
+  - deployment
+  - service
+  - ingress
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Application

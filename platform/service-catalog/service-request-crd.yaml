@@ -1,0 +1,181 @@
+# =============================================================================
+# ServiceRequest Custom Resource Definition
+# =============================================================================
+# Allows teams to request service instances from the catalog.
+# =============================================================================
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: servicerequests.platform.om.io
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  group: platform.om.io
+  names:
+    kind: ServiceRequest
+    listKind: ServiceRequestList
+    plural: servicerequests
+    singular: servicerequest
+    shortNames:
+      - sr
+      - svcreq
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - service
+                - size
+              properties:
+                service:
+                  type: string
+                  enum:
+                    - postgresql
+                    - redis
+                    - rabbitmq
+                    - mongodb
+                    - elasticsearch
+                    - kafka
+                  description: "Service type to provision"
+
+                size:
+                  type: string
+                  enum:
+                    - small
+                    - medium
+                    - large
+                  description: "Service size tier"
+
+                config:
+                  type: object
+                  properties:
+                    version:
+                      type: string
+                      description: "Service version"
+                    storage:
+                      type: string
+                      pattern: "^[0-9]+(Gi|Ti)$"
+                      description: "Custom storage size"
+                    replicas:
+                      type: integer
+                      minimum: 1
+                      maximum: 10
+                      description: "Custom replica count"
+                  additionalProperties:
+                    type: string
+
+                approvalRequired:
+                  type: boolean
+                  default: false
+                  description: "Whether this request requires approval"
+
+                approvedBy:
+                  type: string
+                  description: "Email of approver (if approved)"
+
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Approved
+                    - Provisioning
+                    - Ready
+                    - Failed
+                    - Deleting
+                message:
+                  type: string
+                provisionedResource:
+                  type: object
+                  properties:
+                    apiVersion:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                connection:
+                  type: object
+                  properties:
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    secretName:
+                      type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+
+      subresources:
+        status: {}
+
+      additionalPrinterColumns:
+        - name: Service
+          type: string
+          jsonPath: .spec.service
+        - name: Size
+          type: string
+          jsonPath: .spec.size
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Host
+          type: string
+          jsonPath: .status.connection.host
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+
+---
+# =============================================================================
+# Example Service Requests
+# =============================================================================
+
+apiVersion: platform.om.io/v1alpha1
+kind: ServiceRequest
+metadata:
+  name: api-database
+  namespace: backend-dev
+spec:
+  service: postgresql
+  size: medium
+  config:
+    version: "15"
+
+---
+apiVersion: platform.om.io/v1alpha1
+kind: ServiceRequest
+metadata:
+  name: session-cache
+  namespace: backend-dev
+spec:
+  service: redis
+  size: small
+  config:
+    version: "7.2"

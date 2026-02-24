@@ -1,0 +1,163 @@
+# =============================================================================
+# Wazuh Agent DaemonSet
+# =============================================================================
+# Deploy Wazuh agents on all nodes for security monitoring.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: wazuh-agent
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: wazuh-agent
+    app.kubernetes.io/part-of: om-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wazuh-agent
+    spec:
+      serviceAccountName: wazuh-agent
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: wazuh-agent
+          image: wazuh/wazuh-agent:4.7.0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          env:
+            - name: WAZUH_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: wazuh-agent-config
+                  key: manager-address
+            - name: WAZUH_AGENT_GROUP
+              value: "kubernetes"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: var-log
+              mountPath: /var/log
+              readOnly: true
+            - name: var-lib-docker
+              mountPath: /var/lib/docker
+              readOnly: true
+            - name: etc-os-release
+              mountPath: /etc/os-release
+              readOnly: true
+            - name: wazuh-config
+              mountPath: /var/ossec/etc/ossec.conf
+              subPath: ossec.conf
+          securityContext:
+            privileged: true
+      volumes:
+        - name: var-log
+          hostPath:
+            path: /var/log
+        - name: var-lib-docker
+          hostPath:
+            path: /var/lib/docker
+        - name: etc-os-release
+          hostPath:
+            path: /etc/os-release
+        - name: wazuh-config
+          configMap:
+            name: wazuh-agent-config
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wazuh-agent
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/part-of: om-platform
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-agent-config
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/part-of: om-platform
+data:
+  ossec.conf: |
+    <ossec_config>
+      <client>
+        <server>
+          <address>WAZUH_MANAGER_ADDRESS</address>
+          <port>1514</port>
+          <protocol>tcp</protocol>
+        </server>
+        <enrollment>
+          <enabled>yes</enabled>
+          <manager_address>WAZUH_MANAGER_ADDRESS</manager_address>
+        </enrollment>
+      </client>
+
+      <!-- Log monitoring -->
+      <localfile>
+        <log_format>syslog</log_format>
+        <location>/var/log/syslog</location>
+      </localfile>
+
+      <localfile>
+        <log_format>syslog</log_format>
+        <location>/var/log/auth.log</location>
+      </localfile>
+
+      <!-- Docker logs -->
+      <localfile>
+        <log_format>json</log_format>
+        <location>/var/lib/docker/containers/*/*.log</location>
+      </localfile>
+
+      <!-- File integrity monitoring -->
+      <syscheck>
+        <disabled>no</disabled>
+        <frequency>43200</frequency>
+        <directories check_all="yes">/etc,/usr/bin,/usr/sbin</directories>
+        <directories check_all="yes">/bin,/sbin</directories>
+        <ignore>/etc/mtab</ignore>
+        <ignore>/etc/resolv.conf</ignore>
+      </syscheck>
+
+      <!-- Rootcheck -->
+      <rootcheck>
+        <disabled>no</disabled>
+        <check_files>yes</check_files>
+        <check_trojans>yes</check_trojans>
+        <check_dev>yes</check_dev>
+        <check_sys>yes</check_sys>
+        <check_pids>yes</check_pids>
+        <check_ports>yes</check_ports>
+        <check_if>yes</check_if>
+      </rootcheck>
+
+      <!-- Vulnerability detection -->
+      <wodle name="syscollector">
+        <disabled>no</disabled>
+        <interval>1h</interval>
+        <scan_on_start>yes</scan_on_start>
+        <packages>yes</packages>
+        <ports all="no">yes</ports>
+        <processes>yes</processes>
+      </wodle>
+    </ossec_config>

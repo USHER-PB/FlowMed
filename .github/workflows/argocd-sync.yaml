@@ -1,0 +1,120 @@
+# =============================================================================
+# ArgoCD Application Sync
+# =============================================================================
+# This workflow triggers ArgoCD sync for applications after changes.
+# =============================================================================
+
+name: ArgoCD Sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'argocd/**'
+      - 'helm/**'
+  workflow_dispatch:
+    inputs:
+      application:
+        description: 'Application to sync (leave empty for all)'
+        required: false
+        type: string
+      sync_options:
+        description: 'Sync options'
+        required: false
+        default: '--prune'
+        type: string
+
+env:
+  ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+
+permissions:
+  contents: read
+
+jobs:
+  detect-changes:
+    name: Detect Changed Applications
+    runs-on: ubuntu-latest
+    outputs:
+      applications: ${{ steps.changes.outputs.applications }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect Changed Apps
+        id: changes
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ -n "${{ github.event.inputs.application }}" ]]; then
+              echo "applications=[\"${{ github.event.inputs.application }}\"]" >> $GITHUB_OUTPUT
+            else
+              # Get all applications
+              apps=$(ls argocd/apps/*.yaml 2>/dev/null | xargs -I{} basename {} .yaml | jq -R . | jq -s .)
+              echo "applications=$apps" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Detect changed files
+            changed_files=$(git diff --name-only HEAD^ HEAD)
+            apps="[]"
+
+            # Check ArgoCD app definitions
+            for file in $changed_files; do
+              if [[ $file == argocd/apps/*.yaml ]]; then
+                app=$(basename "$file" .yaml)
+                apps=$(echo "$apps" | jq --arg app "$app" '. + [$app]')
+              fi
+            done
+
+            # If helm charts changed, sync all apps using them
+            if echo "$changed_files" | grep -q "^helm/"; then
+              # Add all applications (they might use the changed charts)
+              all_apps=$(ls argocd/apps/*.yaml 2>/dev/null | xargs -I{} basename {} .yaml | jq -R . | jq -s .)
+              apps=$all_apps
+            fi
+
+            echo "applications=$apps" >> $GITHUB_OUTPUT
+          fi
+
+  sync:
+    name: Sync Application
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.applications != '[]'
+
+    strategy:
+      matrix:
+        application: ${{ fromJson(needs.detect-changes.outputs.applications) }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+
+      - name: ArgoCD Login
+        run: |
+          argocd login ${{ env.ARGOCD_SERVER }} \
+            --username ${{ secrets.ARGOCD_USERNAME }} \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --insecure
+
+      - name: Sync Application
+        run: |
+          echo "Syncing application: ${{ matrix.application }}"
+          argocd app sync ${{ matrix.application }} \
+            ${{ github.event.inputs.sync_options || '--prune' }} \
+            --timeout 300
+
+      - name: Wait for Health
+        run: |
+          argocd app wait ${{ matrix.application }} \
+            --health \
+            --timeout 600

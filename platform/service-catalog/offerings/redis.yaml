@@ -1,0 +1,131 @@
+# =============================================================================
+# Redis Service Offering
+# =============================================================================
+# Managed Redis cache/store using Redis Operator.
+# =============================================================================
+
+apiVersion: platform.om.io/v1alpha1
+kind: ServiceOffering
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    service-catalog/category: cache
+spec:
+  name: redis
+  displayName: "Redis Cache"
+  description: |
+    Managed Redis in-memory data store for caching,
+    session storage, and pub/sub messaging.
+  category: cache
+  icon: "https://redis.io/images/redis-white.png"
+
+  versions:
+    - "7.2"
+    - "7.0"
+    - "6.2"
+  defaultVersion: "7.2"
+
+  sizes:
+    small:
+      displayName: "Small"
+      description: "Development and testing"
+      resources:
+        cpu: 100m
+        memory: 256Mi
+      replicas: 1
+      persistence: false
+      estimatedCost: "$20/month"
+
+    medium:
+      displayName: "Medium"
+      description: "Production caching"
+      resources:
+        cpu: 500m
+        memory: 2Gi
+      replicas: 3
+      persistence: true
+      storage: 10Gi
+      estimatedCost: "$100/month"
+
+    large:
+      displayName: "Large"
+      description: "High-performance production"
+      resources:
+        cpu: 2
+        memory: 8Gi
+      replicas: 6
+      persistence: true
+      storage: 50Gi
+      sentinel: true
+      estimatedCost: "$400/month"
+
+  environmentRestrictions:
+    dev:
+      allowedSizes: ["small", "medium"]
+    staging:
+      allowedSizes: ["small", "medium"]
+    prod:
+      allowedSizes: ["medium", "large"]
+
+  requiredTier: starter
+
+  provisionTemplate: |
+    apiVersion: redis.redis.opstreelabs.in/v1beta1
+    kind: Redis
+    metadata:
+      name: {{ .request.name }}
+      namespace: {{ .request.namespace }}
+      labels:
+        app.kubernetes.io/part-of: om-platform
+        platform.om.io/tenant: {{ .tenant.name }}
+        platform.om.io/service: redis
+    spec:
+      kubernetesConfig:
+        image: redis:{{ .config.version | default "7.2" }}
+        resources:
+          requests:
+            cpu: {{ .size.resources.cpu }}
+            memory: {{ .size.resources.memory }}
+          limits:
+            cpu: {{ .size.resources.cpu }}
+            memory: {{ .size.resources.memory }}
+
+      redisConfig:
+        maxmemory-policy: allkeys-lru
+
+      {{- if eq .size.replicas 1 }}
+      # Standalone mode
+      storage:
+        {{- if .size.persistence }}
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            storageClassName: gp3
+            resources:
+              requests:
+                storage: {{ .size.storage }}
+        {{- end }}
+      {{- else }}
+      # Cluster mode
+      clusterSize: {{ .size.replicas }}
+      clusterVersion: v7
+
+      storage:
+        {{- if .size.persistence }}
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            storageClassName: gp3
+            resources:
+              requests:
+                storage: {{ .size.storage }}
+        {{- end }}
+      {{- end }}
+
+  connectionTemplate: |
+    host: {{ .request.name }}.{{ .request.namespace }}.svc.cluster.local
+    port: 6379
+    secretName: {{ .request.name }}-secret
+
+  cleanupPolicy: Delete

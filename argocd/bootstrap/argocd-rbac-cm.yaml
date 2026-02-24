@@ -1,0 +1,57 @@
+# =============================================================================
+# ArgoCD RBAC ConfigMap
+# =============================================================================
+# Role-based access control configuration for ArgoCD.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Default policy for authenticated users
+  policy.default: role:readonly
+
+  # RBAC policies
+  policy.csv: |
+    # Platform admins have full access
+    p, role:platform-admin, applications, *, */*, allow
+    p, role:platform-admin, clusters, *, *, allow
+    p, role:platform-admin, repositories, *, *, allow
+    p, role:platform-admin, projects, *, *, allow
+    p, role:platform-admin, accounts, *, *, allow
+    p, role:platform-admin, gpgkeys, *, *, allow
+    p, role:platform-admin, logs, get, */*, allow
+    p, role:platform-admin, exec, create, */*, allow
+
+    # Team leads can manage their team's applications
+    p, role:team-lead, applications, *, team-*/*, allow
+    p, role:team-lead, repositories, get, *, allow
+    p, role:team-lead, projects, get, team-*, allow
+    p, role:team-lead, logs, get, team-*/*, allow
+
+    # Developers can sync and view applications in their team
+    p, role:developer, applications, get, team-*/*, allow
+    p, role:developer, applications, sync, team-*/*, allow
+    p, role:developer, repositories, get, *, allow
+    p, role:developer, projects, get, team-*, allow
+    p, role:developer, logs, get, team-*/*, allow
+
+    # Read-only role for all applications
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, repositories, get, *, allow
+    p, role:readonly, projects, get, *, allow
+
+    # Group mappings (update with your identity provider groups)
+    g, platform-admins, role:platform-admin
+    g, team-backend-leads, role:team-lead
+    g, team-backend-devs, role:developer
+    g, team-frontend-leads, role:team-lead
+    g, team-frontend-devs, role:developer
+
+  # Scopes for OIDC
+  scopes: "[groups, email]"

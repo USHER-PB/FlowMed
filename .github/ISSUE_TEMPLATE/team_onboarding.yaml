@@ -1,0 +1,120 @@
+name: Team Onboarding Request
+description: Request to onboard a new team to the OM Platform
+title: "[ONBOARD] Team: "
+labels: ["onboarding", "team-request"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welcome to the OM Platform! Please fill out this form to request onboarding for your team.
+
+  - type: input
+    id: team_name
+    attributes:
+      label: Team Name
+      description: Official name of your team
+      placeholder: e.g., Backend Team, Data Platform
+    validations:
+      required: true
+
+  - type: input
+    id: team_lead
+    attributes:
+      label: Team Lead
+      description: Name and email of the team lead
+      placeholder: John Doe (john.doe@example.com)
+    validations:
+      required: true
+
+  - type: input
+    id: team_slack
+    attributes:
+      label: Team Slack Channel
+      description: Your team's Slack channel for notifications
+      placeholder: "#team-backend"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environments Needed
+      description: Which environments does your team need access to?
+      multiple: true
+      options:
+        - Development
+        - Staging
+        - Production
+    validations:
+      required: true
+
+  - type: textarea
+    id: applications
+    attributes:
+      label: Applications to Deploy
+      description: List the applications your team will deploy
+      placeholder: |
+        - api-service: REST API backend
+        - worker: Background job processor
+        - cron: Scheduled tasks
+    validations:
+      required: true
+
+  - type: dropdown
+    id: resources
+    attributes:
+      label: Resource Requirements
+      description: Estimated resource tier needed
+      options:
+        - Small (< 1 CPU, < 1GB RAM per app)
+        - Medium (1-4 CPU, 1-4GB RAM per app)
+        - Large (4-8 CPU, 4-16GB RAM per app)
+        - Custom (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: custom_resources
+    attributes:
+      label: Custom Resource Requirements
+      description: If you selected "Custom" above, specify your requirements
+      placeholder: |
+        - app1: 2 CPU, 4GB RAM
+        - app2: 4 CPU, 8GB RAM, GPU
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Platform Features Needed
+      description: Select the features your team needs
+      options:
+        - label: Ingress (public endpoints)
+        - label: Database access
+        - label: Message queue access
+        - label: S3/Object storage
+        - label: Secrets management
+        - label: Custom DNS entries
+        - label: VPN access (NetBird)
+        - label: Custom monitoring dashboards
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Requirements
+      description: Any other requirements or special considerations
+      placeholder: Additional requirements...
+
+  - type: checkboxes
+    id: agreement
+    attributes:
+      label: Onboarding Agreement
+      description: Please confirm the following
+      options:
+        - label: Our team has reviewed the OM Platform documentation
+          required: true
+        - label: Our team will follow the platform deployment guidelines
+          required: true
+        - label: We understand that production deployments require approval
+          required: true

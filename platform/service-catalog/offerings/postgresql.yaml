@@ -1,0 +1,146 @@
+# =============================================================================
+# PostgreSQL Service Offering
+# =============================================================================
+# Managed PostgreSQL database using CloudNativePG operator.
+# =============================================================================
+
+apiVersion: platform.om.io/v1alpha1
+kind: ServiceOffering
+metadata:
+  name: postgresql
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    service-catalog/category: database
+spec:
+  name: postgresql
+  displayName: "PostgreSQL Database"
+  description: |
+    Managed PostgreSQL database with automatic backups,
+    high availability options, and connection pooling.
+  category: database
+  icon: "https://www.postgresql.org/media/img/about/press/elephant.png"
+
+  # Versions available
+  versions:
+    - "15"
+    - "14"
+    - "13"
+  defaultVersion: "15"
+
+  # Size configurations
+  sizes:
+    small:
+      displayName: "Small"
+      description: "Development and testing"
+      resources:
+        cpu: 500m
+        memory: 1Gi
+      storage: 10Gi
+      replicas: 1
+      backup:
+        enabled: true
+        retention: 7d
+      estimatedCost: "$50/month"
+
+    medium:
+      displayName: "Medium"
+      description: "Staging and low-traffic production"
+      resources:
+        cpu: 2
+        memory: 4Gi
+      storage: 50Gi
+      replicas: 2
+      backup:
+        enabled: true
+        retention: 30d
+      connectionPooling: true
+      estimatedCost: "$200/month"
+
+    large:
+      displayName: "Large"
+      description: "High-traffic production"
+      resources:
+        cpu: 4
+        memory: 16Gi
+      storage: 200Gi
+      replicas: 3
+      backup:
+        enabled: true
+        retention: 90d
+      connectionPooling: true
+      estimatedCost: "$800/month"
+
+  # Environment restrictions
+  environmentRestrictions:
+    dev:
+      allowedSizes: ["small", "medium"]
+    staging:
+      allowedSizes: ["small", "medium"]
+    prod:
+      allowedSizes: ["medium", "large"]
+      requireApproval: true
+
+  # Required tier for this service
+  requiredTier: starter
+
+  # Template for provisioning
+  provisionTemplate: |
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: {{ .request.name }}
+      namespace: {{ .request.namespace }}
+      labels:
+        app.kubernetes.io/part-of: om-platform
+        platform.om.io/tenant: {{ .tenant.name }}
+        platform.om.io/service: postgresql
+    spec:
+      instances: {{ .size.replicas }}
+
+      postgresql:
+        parameters:
+          max_connections: "200"
+          shared_buffers: "256MB"
+
+      resources:
+        requests:
+          cpu: {{ .size.resources.cpu }}
+          memory: {{ .size.resources.memory }}
+        limits:
+          cpu: {{ .size.resources.cpu }}
+          memory: {{ .size.resources.memory }}
+
+      storage:
+        size: {{ .size.storage }}
+        storageClass: gp3
+
+      backup:
+        barmanObjectStore:
+          destinationPath: s3://om-backups/postgresql/{{ .tenant.name }}/{{ .request.name }}
+          s3Credentials:
+            accessKeyId:
+              name: backup-credentials
+              key: ACCESS_KEY_ID
+            secretAccessKey:
+              name: backup-credentials
+              key: SECRET_ACCESS_KEY
+        retentionPolicy: {{ .size.backup.retention }}
+
+      {{- if .size.connectionPooling }}
+      enableConnectionPooler: true
+      pooler:
+        instances: 2
+        type: rw
+        pgbouncer:
+          poolMode: transaction
+      {{- end }}
+
+  # Connection details output
+  connectionTemplate: |
+    host: {{ .request.name }}-rw.{{ .request.namespace }}.svc.cluster.local
+    port: 5432
+    database: app
+    secretName: {{ .request.name }}-app
+
+  # Cleanup policy
+  cleanupPolicy: Delete

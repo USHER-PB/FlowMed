@@ -1,0 +1,83 @@
+# =============================================================================
+# App of Apps - Root Application
+# =============================================================================
+# This is the root application that manages all other applications.
+# It implements the App of Apps pattern for GitOps management.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-apps
+    app.kubernetes.io/part-of: om-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/skyengpro/om.git
+    targetRevision: main
+    path: argocd/apps
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences in certain fields
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /data
+
+---
+# =============================================================================
+# Platform Infrastructure Apps
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-infrastructure
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-infrastructure
+    app.kubernetes.io/part-of: om-platform
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/skyengpro/om.git
+    targetRevision: main
+    path: argocd/apps/infrastructure
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,128 @@
+# =============================================================================
+# ApplicationSet for Team Applications
+# =============================================================================
+# This ApplicationSet automatically creates ArgoCD Applications for each
+# team's applications defined in the repository.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-applications
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  generators:
+    # Git Generator - Discover applications from directory structure
+    - git:
+        repoURL: https://github.com/skyengpro/om.git
+        revision: main
+        directories:
+          # Each team has a directory: apps/<team>/<app>/
+          - path: apps/*/*
+
+  template:
+    metadata:
+      # Application name: team-appname
+      name: '{{path[1]}}-{{path[2]}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: om-platform
+        team: '{{path[1]}}'
+        app: '{{path[2]}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: 'team-{{path[1]}}'
+
+      source:
+        repoURL: https://github.com/skyengpro/om.git
+        targetRevision: main
+        path: '{{path}}'
+        helm:
+          valueFiles:
+            - values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path[1]}}'
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+---
+# =============================================================================
+# ApplicationSet for Environment-Specific Deployments
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: environment-applications
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  generators:
+    # Matrix generator - Team x Environment
+    - matrix:
+        generators:
+          # List of teams
+          - list:
+              elements:
+                - team: backend
+                - team: frontend
+                - team: data
+
+          # List of environments
+          - list:
+              elements:
+                - env: dev
+                  cluster: https://kubernetes.default.svc
+                - env: staging
+                  cluster: https://kubernetes.default.svc
+                - env: prod
+                  cluster: https://kubernetes.default.svc
+
+  template:
+    metadata:
+      name: '{{team}}-{{env}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: om-platform
+        team: '{{team}}'
+        environment: '{{env}}'
+    spec:
+      project: '{{env}}onment'
+
+      source:
+        repoURL: https://github.com/skyengpro/om.git
+        targetRevision: main
+        path: 'apps/{{team}}'
+        helm:
+          valueFiles:
+            - values.yaml
+            - 'values-{{env}}.yaml'
+
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{team}}-{{env}}'
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

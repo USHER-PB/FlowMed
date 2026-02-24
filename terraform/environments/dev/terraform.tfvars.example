@@ -1,0 +1,27 @@
+# =============================================================================
+# Development Environment - Example Configuration
+# =============================================================================
+# Copy this file to terraform.tfvars and customize for your environment.
+# NEVER commit terraform.tfvars with sensitive data to version control.
+# =============================================================================
+
+# General Configuration
+project_name = "om-platform"
+aws_region   = "us-east-1"
+
+# Networking
+vpc_cidr = "10.0.0.0/16"
+az_count = 2
+
+# Kubernetes
+kubernetes_version = "1.29"
+
+# Platform Components
+enable_argocd       = true
+enable_cert_manager = true
+enable_monitoring   = true
+
+# Helm Chart Versions
+argocd_version           = "5.51.6"
+cert_manager_version     = "1.13.3"
+prometheus_stack_version = "55.5.0"

@@ -1,0 +1,142 @@
+# =============================================================================
+# Resource Quota Tiers
+# =============================================================================
+# Define resource quota tiers for team subscriptions.
+# Teams subscribe to a tier based on their needs.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Tier: Starter (Small teams, development workloads)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-starter
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    quota-tier: starter
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+
+    # Storage
+    requests.storage: 50Gi
+    persistentvolumeclaims: "5"
+
+    # Object Counts
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    replicationcontrollers: "10"
+
+    # Workloads
+    count/deployments.apps: "10"
+    count/statefulsets.apps: "3"
+    count/jobs.batch: "10"
+    count/cronjobs.batch: "5"
+
+    # Networking
+    count/ingresses.networking.k8s.io: "5"
+    count/services.loadbalancers: "0"  # No LBs in starter
+
+---
+# -----------------------------------------------------------------------------
+# Tier: Standard (Medium teams, staging/production)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-standard
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    quota-tier: standard
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "16"
+    requests.memory: 32Gi
+    limits.cpu: "32"
+    limits.memory: 64Gi
+
+    # Storage
+    requests.storage: 200Gi
+    persistentvolumeclaims: "20"
+
+    # Object Counts
+    pods: "100"
+    services: "30"
+    secrets: "50"
+    configmaps: "50"
+    replicationcontrollers: "30"
+
+    # Workloads
+    count/deployments.apps: "30"
+    count/statefulsets.apps: "10"
+    count/jobs.batch: "50"
+    count/cronjobs.batch: "20"
+
+    # Networking
+    count/ingresses.networking.k8s.io: "20"
+    count/services.loadbalancers: "2"
+
+---
+# -----------------------------------------------------------------------------
+# Tier: Enterprise (Large teams, critical workloads)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-enterprise
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    quota-tier: enterprise
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "64"
+    requests.memory: 128Gi
+    limits.cpu: "128"
+    limits.memory: 256Gi
+
+    # Storage
+    requests.storage: 1Ti
+    persistentvolumeclaims: "100"
+
+    # Object Counts
+    pods: "500"
+    services: "100"
+    secrets: "200"
+    configmaps: "200"
+    replicationcontrollers: "100"
+
+    # Workloads
+    count/deployments.apps: "100"
+    count/statefulsets.apps: "30"
+    count/jobs.batch: "200"
+    count/cronjobs.batch: "50"
+
+    # Networking
+    count/ingresses.networking.k8s.io: "50"
+    count/services.loadbalancers: "10"
+
+---
+# -----------------------------------------------------------------------------
+# Tier: Unlimited (Platform team only)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-unlimited
+  labels:
+    app.kubernetes.io/part-of: om-platform
+    quota-tier: unlimited
+spec:
+  hard:
+    # No hard limits - for platform infrastructure only
+    pods: "1000"
+    services: "500"

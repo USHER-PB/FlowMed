@@ -1,0 +1,360 @@
+# =============================================================================
+# Base Application Helm Chart - Default Values
+# =============================================================================
+# This is the standardized application deployment chart for the OM Platform.
+# Teams should create their own values file inheriting from this template.
+# =============================================================================
+
+# =============================================================================
+# Application Metadata
+# =============================================================================
+
+# Application name (required - override in your values file)
+name: ""
+
+# Team that owns this application
+team: ""
+
+# Environment (dev, staging, prod)
+environment: dev
+
+# =============================================================================
+# Container Configuration
+# =============================================================================
+
+image:
+  repository: ""
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# =============================================================================
+# Deployment Configuration
+# =============================================================================
+
+replicaCount: 1
+
+# Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# =============================================================================
+# Container Resources
+# =============================================================================
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# =============================================================================
+# Health Checks
+# =============================================================================
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 30
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  protocol: TCP
+  annotations: {}
+
+# Additional ports (for multiple services)
+additionalPorts: []
+  # - name: grpc
+  #   port: 9090
+  #   targetPort: 9090
+  #   protocol: TCP
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: app-tls
+    #   hosts:
+    #     - app.example.com
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+
+# Plain environment variables
+env: []
+  # - name: LOG_LEVEL
+  #   value: "info"
+
+# Environment variables from ConfigMaps
+envFrom: []
+  # - configMapRef:
+  #     name: my-config
+
+# Environment variables from Secrets
+secretEnv: []
+  # - name: DATABASE_PASSWORD
+  #   secretName: db-secret
+  #   key: password
+
+# =============================================================================
+# ConfigMaps
+# =============================================================================
+
+configMaps:
+  enabled: false
+  data: {}
+    # config.yaml: |
+    #   key: value
+
+# Mount ConfigMap as volume
+configMapVolume:
+  enabled: false
+  mountPath: /config
+  name: ""
+
+# =============================================================================
+# Secrets
+# =============================================================================
+
+# Create secrets from values (use external-secrets in production)
+secrets:
+  enabled: false
+  data: {}
+    # API_KEY: "base64-encoded-value"
+
+# Mount secrets as volume
+secretVolume:
+  enabled: false
+  mountPath: /secrets
+  name: ""
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes: []
+  # - name: data
+  #   persistentVolumeClaim:
+  #     claimName: app-data
+
+volumeMounts: []
+  # - name: data
+  #   mountPath: /data
+
+# Persistent Volume Claims
+persistentVolumeClaims: []
+  # - name: app-data
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   storageClassName: gp3
+  #   size: 10Gi
+
+# =============================================================================
+# Horizontal Pod Autoscaler
+# =============================================================================
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+
+# =============================================================================
+# Service Account
+# =============================================================================
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/my-role
+
+# =============================================================================
+# Pod Security
+# =============================================================================
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# =============================================================================
+# Scheduling
+# =============================================================================
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Topology spread for high availability
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfied: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       app: myapp
+
+# =============================================================================
+# Network Policies
+# =============================================================================
+
+networkPolicy:
+  enabled: false
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - port: http
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 443
+          protocol: TCP
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+
+metrics:
+  enabled: true
+  port: 9090
+  path: /metrics
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+podMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+
+# =============================================================================
+# Pod Annotations & Labels
+# =============================================================================
+
+podAnnotations: {}
+
+podLabels: {}
+
+# =============================================================================
+# Init Containers
+# =============================================================================
+
+initContainers: []
+  # - name: init-db
+  #   image: busybox
+  #   command: ['sh', '-c', 'until nc -z db 5432; do sleep 1; done']
+
+# =============================================================================
+# Sidecar Containers
+# =============================================================================
+
+sidecars: []
+  # - name: log-shipper
+  #   image: fluent/fluent-bit
+  #   resources:
+  #     requests:
+  #       cpu: 50m
+  #       memory: 64Mi
+
+# =============================================================================
+# Additional Labels
+# =============================================================================
+
+commonLabels: {}
+
+# =============================================================================
+# Additional Annotations
+# =============================================================================
+
+commonAnnotations: {}

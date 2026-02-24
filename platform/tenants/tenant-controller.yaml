@@ -1,0 +1,230 @@
+# =============================================================================
+# Tenant Controller
+# =============================================================================
+# Kubernetes controller that reconciles Tenant CRs and provisions:
+# - Namespaces (per environment)
+# - ResourceQuotas
+# - LimitRanges
+# - RBAC (RoleBindings)
+# - NetworkPolicies
+# - ArgoCD Projects
+# - Service instances
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-system
+  labels:
+    app.kubernetes.io/part-of: om-platform
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-controller
+  namespace: tenant-system
+  labels:
+    app.kubernetes.io/name: tenant-controller
+    app.kubernetes.io/part-of: om-platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-controller
+  labels:
+    app.kubernetes.io/name: tenant-controller
+    app.kubernetes.io/part-of: om-platform
+rules:
+  # Tenant CRD management
+  - apiGroups: ["platform.om.io"]
+    resources: ["tenants", "tenants/status"]
+    verbs: ["*"]
+
+  # Namespace management
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["*"]
+
+  # Resource management within namespaces
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges", "serviceaccounts", "secrets", "configmaps"]
+    verbs: ["*"]
+
+  # RBAC management
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["*"]
+
+  # Network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["*"]
+
+  # ArgoCD integration
+  - apiGroups: ["argoproj.io"]
+    resources: ["appprojects", "applications"]
+    verbs: ["*"]
+
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-controller
+  labels:
+    app.kubernetes.io/name: tenant-controller
+    app.kubernetes.io/part-of: om-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-controller
+subjects:
+  - kind: ServiceAccount
+    name: tenant-controller
+    namespace: tenant-system
+
+---
+# Controller Deployment
+# Note: This is a placeholder - actual controller implementation would use
+# a framework like Kubebuilder, Operator SDK, or Metacontroller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-controller
+  namespace: tenant-system
+  labels:
+    app.kubernetes.io/name: tenant-controller
+    app.kubernetes.io/part-of: om-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tenant-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tenant-controller
+        app.kubernetes.io/part-of: om-platform
+    spec:
+      serviceAccountName: tenant-controller
+      containers:
+        - name: controller
+          # Replace with actual controller image
+          image: ghcr.io/skyengpro/om-tenant-controller:latest
+          imagePullPolicy: Always
+          args:
+            - --leader-elect=true
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+---
+# ConfigMap for controller configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-controller-config
+  namespace: tenant-system
+  labels:
+    app.kubernetes.io/name: tenant-controller
+    app.kubernetes.io/part-of: om-platform
+data:
+  config.yaml: |
+    # Tenant Controller Configuration
+
+    # Namespace naming template
+    namespaceTemplate: "{{ .tenant.name }}-{{ .environment }}"
+
+    # Default quota tier if not specified
+    defaultTier: starter
+
+    # Environments available
+    environments:
+      - name: dev
+        cluster: in-cluster
+        autoSync: true
+      - name: staging
+        cluster: in-cluster
+        autoSync: true
+      - name: prod
+        cluster: in-cluster
+        autoSync: false  # Manual approval required
+
+    # ArgoCD configuration
+    argocd:
+      namespace: argocd
+      projectTemplate: |
+        apiVersion: argoproj.io/v1alpha1
+        kind: AppProject
+        metadata:
+          name: team-{{ .tenant.name }}
+          namespace: argocd
+        spec:
+          description: "Project for {{ .tenant.displayName }}"
+          sourceRepos:
+            - https://github.com/skyengpro/om.git
+          destinations:
+            {{- range .namespaces }}
+            - namespace: {{ . }}
+              server: https://kubernetes.default.svc
+            {{- end }}
+          clusterResourceWhitelist:
+            - group: ""
+              kind: Namespace
+          namespaceResourceWhitelist:
+            - group: "*"
+              kind: "*"
+
+    # Labels to apply to all tenant resources
+    commonLabels:
+      app.kubernetes.io/managed-by: tenant-controller
+      platform.om.io/tenant: "{{ .tenant.name }}"
+      platform.om.io/tier: "{{ .tenant.tier }}"
+      platform.om.io/cost-center: "{{ .tenant.costCenter }}"
+
+    # Network policy defaults
+    networkPolicies:
+      denyAllByDefault: true
+      allowDNS: true
+      allowPrometheusScaping: true
+      allowIngressController: true

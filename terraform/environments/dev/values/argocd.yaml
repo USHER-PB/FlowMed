@@ -1,0 +1,112 @@
+# =============================================================================
+# ArgoCD Configuration - Development Environment
+# =============================================================================
+
+global:
+  image:
+    tag: "v2.9.3"
+
+# Server Configuration
+server:
+  replicas: 1
+
+  ingress:
+    enabled: false  # Enable when ingress controller is ready
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  config:
+    # Repository configuration
+    repositories: |
+      - type: git
+        url: https://github.com/skyengpro/om.git
+        name: om-platform
+
+    # Resource tracking method
+    resource.tracking.method: annotation
+
+    # Status badge
+    statusbadge.enabled: "true"
+
+    # Application controller settings
+    timeout.reconciliation: 180s
+
+  rbacConfig:
+    policy.default: role:readonly
+    policy.csv: |
+      g, platform-admins, role:admin
+
+# Controller Configuration
+controller:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Repo Server Configuration
+repoServer:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Application Set Controller
+applicationSet:
+  enabled: true
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Notifications Controller
+notifications:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Redis Configuration
+redis:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Dex (OIDC) - Disable in dev, enable for SSO
+dex:
+  enabled: false
