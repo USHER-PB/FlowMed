@@ -58,16 +58,26 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       - name: Summary
-        run: |
-          echo "## Release Please Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.release.outputs.release_created }}" == "true" ]; then
-            echo "Release created: **${{ steps.release.outputs.tag_name }}**" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ steps.release.outputs.pr }}" != "" ]; then
-            echo "Release PR created/updated: #${{ steps.release.outputs.pr }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No release action needed" >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releaseCreated = '${{ steps.release.outputs.release_created }}' === 'true';
+            const tagName = '${{ steps.release.outputs.tag_name }}';
+            const prsCreated = '${{ steps.release.outputs.prs_created }}' === 'true';
+
+            let summary = '## Release Please Results\n\n';
+
+            if (releaseCreated) {
+              summary += `✅ Release created: **${tagName}**\n`;
+              summary += `\n[View Release](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tagName})`;
+            } else if (prsCreated) {
+              summary += '📝 Release PR created/updated\n';
+              summary += '\nCheck the [Pull Requests](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/pulls) for the release PR.';
+            } else {
+              summary += 'ℹ️ No release action needed';
+            }
+
+            await core.summary.addRaw(summary).write();
 
   # ===========================================================================
   # Post-Release Actions
