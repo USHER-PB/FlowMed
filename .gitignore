@@ -35,3 +35,7 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+## Ignore prompts directory which may contain sensitive data or be used for local testing
+prompts/
+./pompts/
