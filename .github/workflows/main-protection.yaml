@@ -32,30 +32,19 @@ jobs:
     steps:
       - name: Check if PR Merge
         id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          COMMIT_SHA="${{ github.sha }}"
           COMMIT_MSG="${{ github.event.head_commit.message }}"
 
           # Check if this is a merge commit from a PR
           if echo "$COMMIT_MSG" | grep -qE "^Merge pull request #[0-9]+"; then
             echo "type=pr-merge" >> $GITHUB_OUTPUT
             echo "This is a PR merge commit"
-          elif echo "$COMMIT_MSG" | grep -qE "^\(#[0-9]+\)$"; then
+          elif echo "$COMMIT_MSG" | grep -qE "\(#[0-9]+\)"; then
             echo "type=squash-merge" >> $GITHUB_OUTPUT
             echo "This is a squash merge commit"
           else
-            # Check if any PR was merged with this commit
-            PR_NUMBER=$(gh pr list --state merged --json number,mergeCommit --jq ".[] | select(.mergeCommit.oid == \"$COMMIT_SHA\") | .number" 2>/dev/null || echo "")
-
-            if [ -n "$PR_NUMBER" ]; then
-              echo "type=pr-merge" >> $GITHUB_OUTPUT
-              echo "This commit is from PR #$PR_NUMBER"
-            else
-              echo "type=direct-push" >> $GITHUB_OUTPUT
-              echo "::warning::Direct push to main detected!"
-            fi
+            echo "type=direct-push" >> $GITHUB_OUTPUT
+            echo "::warning::Direct push to main detected!"
           fi
 
       - name: Log Direct Push
@@ -72,40 +61,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Recommendation:** Please use Pull Requests for all changes to main." >> $GITHUB_STEP_SUMMARY
 
-      - name: Create Issue for Direct Push
-        if: steps.check.outputs.type == 'direct-push' && vars.CREATE_ISSUE_ON_DIRECT_PUSH == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = `Direct push to main: ${context.sha.substring(0, 7)}`;
-            const body = `## Direct Push Detected
-
-            A direct push to the main branch was detected.
-
-            | Field | Value |
-            |-------|-------|
-            | **Commit** | ${context.sha} |
-            | **Author** | ${{ github.event.head_commit.author.name }} |
-            | **Message** | ${{ github.event.head_commit.message }} |
-            | **Timestamp** | ${{ github.event.head_commit.timestamp }} |
-
-            ### Recommendation
-            Please use Pull Requests for all changes to main. This ensures:
-            - Code review
-            - CI checks pass
-            - Change history is clear
-
-            ---
-            *This issue was automatically created by the branch protection workflow.*
-            `;
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: title,
-              body: body,
-              labels: ['direct-push', 'needs-review']
-            });
+      - name: Log PR Merge
+        if: steps.check.outputs.type == 'pr-merge' || steps.check.outputs.type == 'squash-merge'
+        run: |
+          echo "## PR Merge Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit \`${{ github.sha }}\` is from a Pull Request merge." >> $GITHUB_STEP_SUMMARY
 
   # =============================================================================
   # Commit Signing Check
@@ -116,24 +77,32 @@ jobs:
 
     steps:
       - name: Check GPG Signature
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          COMMIT_SHA="${{ github.sha }}"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha
+            });
 
-          # Get commit verification status
-          VERIFIED=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA --jq '.commit.verification.verified')
+            const verified = commit.data.commit.verification.verified;
+            const reason = commit.data.commit.verification.reason;
 
-          if [ "$VERIFIED" == "true" ]; then
-            echo "Commit is signed and verified"
-            echo "## Commit Signature" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Commit \`$COMMIT_SHA\` is signed and verified." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "::warning::Commit is not signed or verification failed"
-            echo "## Commit Signature" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Commit \`$COMMIT_SHA\` is **not signed** or verification failed." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Consider enabling commit signing: https://docs.github.com/en/authentication/managing-commit-signature-verification" >> $GITHUB_STEP_SUMMARY
-          fi
+            if (verified) {
+              core.info('Commit is signed and verified');
+              await core.summary
+                .addHeading('Commit Signature', 2)
+                .addRaw(`Commit \`${context.sha}\` is **signed and verified**.`)
+                .write();
+            } else {
+              core.warning('Commit is not signed or verification failed');
+              await core.summary
+                .addHeading('Commit Signature', 2)
+                .addRaw(`Commit \`${context.sha}\` is **not signed** or verification failed.`)
+                .addBreak()
+                .addRaw(`Reason: ${reason}`)
+                .addBreak()
+                .addLink('Learn about commit signing', 'https://docs.github.com/en/authentication/managing-commit-signature-verification')
+                .write();
+            }
