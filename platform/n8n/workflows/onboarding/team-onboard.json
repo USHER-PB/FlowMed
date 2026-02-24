@@ -1,0 +1,245 @@
+{
+  "name": "Team Onboarding Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "team-onboarding",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook - GitHub Issue",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "team-onboarding"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"action\"]}}",
+              "value2": "labeled"
+            },
+            {
+              "value1": "={{$json[\"body\"][\"label\"][\"name\"]}}",
+              "value2": "approved"
+            }
+          ]
+        }
+      },
+      "name": "Is Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse team info from issue body\nconst body = $input.item.json.body.issue.body;\n\n// Extract fields using regex\nconst teamName = body.match(/Team Name[\\s\\S]*?\\n([^\\n]+)/i)?.[1]?.trim();\nconst owner = body.match(/Team Lead[\\s\\S]*?\\n([^\\n]+)/i)?.[1]?.trim();\nconst tier = body.match(/Resource Tier[\\s\\S]*?\\n([^\\n]+)/i)?.[1]?.toLowerCase()?.trim();\nconst costCenter = body.match(/Cost Center[\\s\\S]*?\\n([^\\n]+)/i)?.[1]?.trim();\nconst slackChannel = body.match(/Slack Channel[\\s\\S]*?\\n([^\\n]+)/i)?.[1]?.trim();\n\n// Extract environments\nconst envSection = body.match(/Environments Needed[\\s\\S]*?\\n([\\s\\S]*?)(?=\\n##|$)/i)?.[1];\nconst environments = [];\nif (envSection?.includes('Development')) environments.push('dev');\nif (envSection?.includes('Staging')) environments.push('staging');\nif (envSection?.includes('Production')) environments.push('prod');\n\nreturn {\n  teamName: teamName?.toLowerCase()?.replace(/[^a-z0-9-]/g, '-'),\n  displayName: teamName,\n  owner,\n  tier: tier || 'starter',\n  costCenter,\n  slackChannel,\n  environments: environments.length > 0 ? environments : ['dev'],\n  issueNumber: $input.item.json.body.issue.number,\n  issueUrl: $input.item.json.body.issue.html_url\n};"
+      },
+      "name": "Parse Issue Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://kubernetes.default.svc/apis/platform.om.io/v1alpha1/tenants",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"apiVersion\": \"platform.om.io/v1alpha1\",\n  \"kind\": \"Tenant\",\n  \"metadata\": {\n    \"name\": \"{{$json.teamName}}\"\n  },\n  \"spec\": {\n    \"name\": \"{{$json.teamName}}\",\n    \"displayName\": \"{{$json.displayName}}\",\n    \"owner\": \"{{$json.owner}}\",\n    \"tier\": \"{{$json.tier}}\",\n    \"environments\": {{$json.environments}},\n    \"costCenter\": \"{{$json.costCenter}}\",\n    \"contacts\": {\n      \"slack\": \"{{$json.slackChannel}}\"\n    }\n  }\n}"
+      },
+      "name": "Create Tenant CR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3",
+          "name": "Kubernetes SA Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "create",
+        "channel": "=team-{{$json.teamName}}",
+        "isPrivate": false
+      },
+      "name": "Create Slack Channel",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1050, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "=#team-{{$json.teamName}}",
+        "text": "=:tada: *Welcome to the OM Platform!*\n\nYour team *{{$json.displayName}}* has been onboarded.\n\n*Namespaces created:*\n{{$json.environments.map(e => '• `' + $json.teamName + '-' + e + '`').join('\\n')}}\n\n*Resource Tier:* {{$json.tier}}\n\n*Getting Started:*\n1. Review the <https://github.com/skyengpro/om/blob/main/docs/getting-started/README.md|Getting Started Guide>\n2. Deploy your first app using the `base-app` Helm chart\n3. Request services via the Service Catalog\n\nNeed help? Ask in #platform-support"
+      },
+      "name": "Welcome Message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1250, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "owner": "skyengpro",
+        "repository": "om",
+        "issueNumber": "={{$json.issueNumber}}",
+        "body": "=## Onboarding Complete! :white_check_mark:\n\nTeam **{{$json.displayName}}** has been successfully onboarded to the OM Platform.\n\n### Resources Created\n\n| Resource | Details |\n|----------|----------|\n| Namespaces | {{$json.environments.map(e => '`' + $json.teamName + '-' + e + '`').join(', ')}} |\n| Resource Tier | {{$json.tier}} |\n| Slack Channel | #team-{{$json.teamName}} |\n| ArgoCD Project | team-{{$json.teamName}} |\n\n### Next Steps\n\n1. Join the Slack channel: #team-{{$json.teamName}}\n2. Review the [Getting Started Guide](https://github.com/skyengpro/om/blob/main/docs/getting-started/README.md)\n3. Deploy your first application\n\n---\n*Automated by OM Platform*"
+      },
+      "name": "Comment on Issue",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1050, 400],
+      "credentials": {
+        "githubApi": {
+          "id": "4",
+          "name": "GitHub Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "owner": "skyengpro",
+        "repository": "om",
+        "issueNumber": "={{$json.issueNumber}}",
+        "state": "closed"
+      },
+      "name": "Close Issue",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1250, 400],
+      "credentials": {
+        "githubApi": {
+          "id": "4",
+          "name": "GitHub Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#platform-onboarding",
+        "text": "=:new: *New Team Onboarded*\n\n*Team:* {{$json.displayName}}\n*Owner:* {{$json.owner}}\n*Tier:* {{$json.tier}}\n*Environments:* {{$json.environments.join(', ')}}\n\n<{{$json.issueUrl}}|View Issue>"
+      },
+      "name": "Notify Platform Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - GitHub Issue": {
+      "main": [
+        [
+          {
+            "node": "Is Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Approved?": {
+      "main": [
+        [
+          {
+            "node": "Parse Issue Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Issue Body": {
+      "main": [
+        [
+          {
+            "node": "Create Tenant CR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tenant CR": {
+      "main": [
+        [
+          {
+            "node": "Create Slack Channel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Comment on Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Slack Channel": {
+      "main": [
+        [
+          {
+            "node": "Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment on Issue": {
+      "main": [
+        [
+          {
+            "node": "Close Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Close Issue": {
+      "main": [
+        [
+          {
+            "node": "Notify Platform Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "onboarding"
+    }
+  ]
+}

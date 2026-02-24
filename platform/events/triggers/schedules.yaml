@@ -1,0 +1,155 @@
+# =============================================================================
+# Scheduled Triggers
+# =============================================================================
+# Defines scheduled workflows for recurring platform tasks.
+# =============================================================================
+
+schedules:
+  # ===========================================================================
+  # Daily Schedules
+  # ===========================================================================
+
+  - name: daily-cost-report
+    description: Generate and send daily cost report to team leads
+    cron: "0 9 * * 1-5"  # 9:00 AM UTC, Monday-Friday
+    timezone: UTC
+    workflow: platform/n8n/workflows/reporting/daily-cost-report.json
+    enabled: true
+    notifications:
+      onSuccess:
+        - slack:#platform-costs
+      onFailure:
+        - slack:#platform-alerts
+        - pagerduty:platform-oncall
+
+  - name: daily-security-scan
+    description: Run daily security compliance scan
+    cron: "0 6 * * *"  # 6:00 AM UTC daily
+    timezone: UTC
+    workflow: platform/n8n/workflows/security/compliance-scan.json
+    enabled: true
+    notifications:
+      onFailure:
+        - slack:#platform-security
+
+  - name: daily-backup-verification
+    description: Verify backup jobs completed successfully
+    cron: "0 7 * * *"  # 7:00 AM UTC daily
+    timezone: UTC
+    workflow: platform/n8n/workflows/maintenance/backup-verify.json
+    enabled: true
+
+  # ===========================================================================
+  # Hourly Schedules
+  # ===========================================================================
+
+  - name: hourly-health-check
+    description: Platform-wide health check
+    cron: "0 * * * *"  # Every hour
+    timezone: UTC
+    workflow: platform/n8n/workflows/monitoring/health-check.json
+    enabled: true
+    notifications:
+      onFailure:
+        - slack:#platform-critical
+        - pagerduty:platform-oncall
+
+  - name: hourly-quota-check
+    description: Check teams approaching quota limits
+    cron: "30 * * * *"  # Every hour at :30
+    timezone: UTC
+    workflow: platform/n8n/workflows/monitoring/quota-check.json
+    enabled: true
+
+  # ===========================================================================
+  # Weekly Schedules
+  # ===========================================================================
+
+  - name: weekly-cost-summary
+    description: Weekly cost summary for finance
+    cron: "0 8 * * 1"  # 8:00 AM UTC Monday
+    timezone: UTC
+    workflow: platform/n8n/workflows/reporting/weekly-cost-summary.json
+    enabled: true
+    notifications:
+      onSuccess:
+        - email:finance@example.com
+        - slack:#platform-costs
+
+  - name: weekly-compliance-report
+    description: Generate weekly compliance report
+    cron: "0 9 * * 1"  # 9:00 AM UTC Monday
+    timezone: UTC
+    workflow: platform/n8n/workflows/security/weekly-compliance.json
+    enabled: true
+
+  - name: weekly-unused-resources
+    description: Identify unused resources for cleanup
+    cron: "0 10 * * 1"  # 10:00 AM UTC Monday
+    timezone: UTC
+    workflow: platform/n8n/workflows/maintenance/unused-resources.json
+    enabled: true
+    notifications:
+      onSuccess:
+        - slack:#platform-costs
+
+  # ===========================================================================
+  # Monthly Schedules
+  # ===========================================================================
+
+  - name: monthly-capacity-review
+    description: Monthly capacity planning review
+    cron: "0 9 1 * *"  # 9:00 AM UTC, 1st of month
+    timezone: UTC
+    workflow: platform/n8n/workflows/reporting/capacity-review.json
+    enabled: true
+    notifications:
+      onSuccess:
+        - email:platform-team@example.com
+        - slack:#platform-planning
+
+  - name: monthly-certificate-audit
+    description: Audit TLS certificates expiring in next 30 days
+    cron: "0 8 1 * *"  # 8:00 AM UTC, 1st of month
+    timezone: UTC
+    workflow: platform/n8n/workflows/security/cert-audit.json
+    enabled: true
+
+  - name: monthly-access-review
+    description: Generate access review report for compliance
+    cron: "0 9 15 * *"  # 9:00 AM UTC, 15th of month
+    timezone: UTC
+    workflow: platform/n8n/workflows/security/access-review.json
+    enabled: true
+    notifications:
+      onSuccess:
+        - email:security@example.com
+
+---
+# CronJob for schedule controller
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: n8n-scheduler
+  namespace: platform
+  labels:
+    app.kubernetes.io/part-of: om-platform
+spec:
+  schedule: "* * * * *"  # Check every minute
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: n8n-scheduler
+          containers:
+            - name: scheduler
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # This is a simple scheduler that triggers n8n workflows
+                  # In production, use n8n's built-in cron or Argo Events
+                  echo "Scheduler running at $(date)"
+          restartPolicy: OnFailure

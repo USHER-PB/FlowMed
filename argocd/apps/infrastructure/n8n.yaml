@@ -1,0 +1,39 @@
+# =============================================================================
+# n8n Workflow Automation Application
+# =============================================================================
+# Deploys n8n for platform workflow automation.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: n8n
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: n8n
+    app.kubernetes.io/part-of: om-platform
+    component: automation
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://8gears.container-registry.com/chartrepo/library
+    chart: n8n
+    targetRevision: 0.23.0
+    helm:
+      releaseName: n8n
+      valueFiles:
+        - https://raw.githubusercontent.com/skyengpro/om/main/platform/n8n/values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

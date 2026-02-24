@@ -22,6 +22,7 @@ OM (Operation and Maintenance) is a **central SRE/Platform Engineering platform*
 | Feature | Description |
 |---------|-------------|
 | **Self-Service Portal** | Backstage-based developer portal for team onboarding and app deployment |
+| **Workflow Automation** | n8n-powered approval workflows, onboarding automation, and alert handling |
 | **Multi-Tenant Platform** | Isolated namespaces, quotas, and RBAC per team |
 | **Service Catalog** | Pre-approved managed services (PostgreSQL, Redis, RabbitMQ) |
 | **GitOps Deployments** | ArgoCD-based continuous delivery from Git |
@@ -33,64 +34,101 @@ OM (Operation and Maintenance) is a **central SRE/Platform Engineering platform*
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────┐
-│                           OM Central SRE Platform                                   │
+│                           OM Central SRE Platform                                  │
 ├────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                     │
+│                                                                                    │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐ │
 │  │                      Self-Service Portal (Backstage)                          │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │ │
-│  │  │   Onboard   │  │   Create    │  │   Request   │  │    View     │          │ │
-│  │  │    Team     │  │    App      │  │   Service   │  │   Status    │          │ │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘          │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │ │
+│  │  │   Onboard   │  │   Create    │  │   Request   │  │    View     │           │ │
+│  │  │    Team     │  │    App      │  │   Service   │  │   Status    │           │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘           │ │
 │  └───────────────────────────────────────────────────────────────────────────────┘ │
 │                                         │                                          │
 │                                         ▼                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐ │
-│  │                         Platform Controllers                                   │ │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  │ │
-│  │  │    Tenant     │  │    Service    │  │    ArgoCD     │  │   GitHub      │  │ │
-│  │  │  Controller   │  │    Catalog    │  │   (GitOps)    │  │   Actions     │  │ │
-│  │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  │ │
-│  │          │                  │                  │                  │          │ │
-│  │          ▼                  ▼                  ▼                  ▼          │ │
-│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐   │ │
-│  │  │ Namespaces  │    │ PostgreSQL  │    │  Helm Apps  │    │  Terraform  │   │ │
-│  │  │ Quotas/RBAC │    │ Redis/RMQ   │    │   Sync      │    │   CI/CD     │   │ │
-│  │  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘   │ │
+│  │                    Workflow Automation (n8n)                                  │ │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │ │
+│  │  │   Approval    │  │  Onboarding   │  │   Alerting    │  │  Reporting    │   │ │
+│  │  │   Workflows   │  │   Automation  │  │   Handlers    │  │  Schedules    │   │ │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘  └───────────────┘   │ │
+│  └───────────────────────────────────────────────────────────────────────────────┘ │
+│                                         │                                          │
+│                                         ▼                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐ │
+│  │                         Platform Controllers                                  │ │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │ │
+│  │  │    Tenant     │  │    Service    │  │    ArgoCD     │  │   GitHub      │   │ │
+│  │  │  Controller   │  │    Catalog    │  │   (GitOps)    │  │   Actions     │   │ │
+│  │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘   │ │
+│  │          │                  │                  │                  │           │ │
+│  │          ▼                  ▼                  ▼                  ▼           │ │
+│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │ │
+│  │  │ Namespaces  │    │ PostgreSQL  │    │  Helm Apps  │    │  Terraform  │     │ │
+│  │  │ Quotas/RBAC │    │ Redis/RMQ   │    │   Sync      │    │   CI/CD     │     │ │
+│  │  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘     │ │
 │  └───────────────────────────────────────────────────────────────────────────────┘ │
 │                                         │                                          │
 │                                         ▼                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐ │
 │  │                          Kubernetes Cluster (EKS)                             │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────────┐ │ │
-│  │  │                         Team Namespaces                                  │ │ │
-│  │  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐            │ │ │
-│  │  │  │ team-a    │  │ team-b    │  │ team-c    │  │ team-n    │            │ │ │
-│  │  │  │ (dev/stg/ │  │ (dev/stg/ │  │ (dev/stg/ │  │ (dev/stg/ │            │ │ │
-│  │  │  │  prod)    │  │  prod)    │  │  prod)    │  │  prod)    │            │ │ │
-│  │  │  └───────────┘  └───────────┘  └───────────┘  └───────────┘            │ │ │
-│  │  └─────────────────────────────────────────────────────────────────────────┘ │ │
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐  │ │
+│  │  │                         Team Namespaces                                 │  │ │
+│  │  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐             │  │ │
+│  │  │  │ team-a    │  │ team-b    │  │ team-c    │  │ team-n    │             │  │ │
+│  │  │  │ (dev/stg/ │  │ (dev/stg/ │  │ (dev/stg/ │  │ (dev/stg/ │             │  │ │
+│  │  │  │  prod)    │  │  prod)    │  │  prod)    │  │  prod)    │             │  │ │
+│  │  │  └───────────┘  └───────────┘  └───────────┘  └───────────┘             │  │ │
+│  │  └─────────────────────────────────────────────────────────────────────────┘  │ │
 │  └───────────────────────────────────────────────────────────────────────────────┘ │
 │                                         │                                          │
 │                                         ▼                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐ │
-│  │                      Policy & Security Layer                                   │ │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────┐ │ │
-│  │  │   OPA   │  │ Network │  │  Cert   │  │ Wazuh   │  │ NetBird │  │AdGuard│ │ │
-│  │  │Gatekeeper│  │ Policy  │  │ Manager │  │  SIEM   │  │   VPN   │  │  DNS  │ │ │
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └───────┘ │ │
+│  │                      Policy & Security Layer                                  │ │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────┐   │ │
+│  │  │   OPA   │  │ Network │  │  Cert   │  │ Wazuh   │  │ NetBird │  │AdGuard│   │ │
+│  │  │Gatekeeper│ │ Policy  │  │ Manager │  │  SIEM   │  │   VPN   │  │  DNS  │   │ │
+│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └───────┘   │ │
 │  └───────────────────────────────────────────────────────────────────────────────┘ │
 │                                         │                                          │
 │                                         ▼                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐ │
-│  │                         Observability Stack                                    │ │
-│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐               │ │
-│  │  │   Prometheus    │  │     Grafana     │  │   Alertmanager  │               │ │
-│  │  │   (Metrics)     │  │   (Dashboards)  │  │   (Alerting)    │               │ │
-│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘               │ │
+│  │                         Observability Stack                                   │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                │ │
+│  │  │   Prometheus    │  │     Grafana     │  │   Alertmanager  │                │ │
+│  │  │   (Metrics)     │  │   (Dashboards)  │  │   (Alerting)    │                │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘                │ │
 │  └───────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                     │
+│                                                                                    │
 └────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Event-Driven Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Platform Event Flow                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   Event Sources              n8n Workflows                 Actions          │
+│   ┌─────────────┐         ┌─────────────────┐         ┌─────────────┐       │
+│   │ Kubernetes  │────────▶│  Onboarding     │────────▶│  Namespaces │       │
+│   │ (Tenants)   │         │  Automation     │         │  RBAC/Quotas│       │
+│   └─────────────┘         └─────────────────┘         └─────────────┘       │
+│   ┌─────────────┐         ┌─────────────────┐         ┌─────────────┐       │
+│   │   ArgoCD    │────────▶│  Prod Approval  │────────▶│  Slack/     │       │
+│   │ (Deploys)   │         │  Workflow       │         │  PagerDuty  │       │
+│   └─────────────┘         └─────────────────┘         └─────────────┘       │
+│   ┌─────────────┐         ┌─────────────────┐         ┌─────────────┐       │
+│   │ Prometheus  │────────▶│  Alert Handler  │────────▶│  Escalation │       │
+│   │ (Alerts)    │         │                 │         │  Jira/Email │       │
+│   └─────────────┘         └─────────────────┘         └─────────────┘       │
+│   ┌─────────────┐         ┌─────────────────┐         ┌─────────────┐       │
+│   │  Scheduled  │────────▶│  Cost Reports   │────────▶│  Finance    │       │
+│   │  (Cron)     │         │  Compliance     │         │  Security   │       │
+│   └─────────────┘         └─────────────────┘         └─────────────┘       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## How Teams Use the Platform
@@ -215,8 +253,13 @@ om/
 │   ├── quotas/                   # Resource quota tiers
 │   ├── service-catalog/          # Managed services
 │   │   └── offerings/            # PostgreSQL, Redis, RabbitMQ
-│   └── portal/                   # Backstage configuration
-│       └── backstage/            # Templates & config
+│   ├── portal/                   # Backstage configuration
+│   │   └── backstage/            # Templates & config
+│   ├── n8n/                      # Workflow Automation
+│   │   └── workflows/            # Approval, onboarding, alerting
+│   └── events/                   # Event-Driven Architecture
+│       ├── handlers/             # Event handlers
+│       └── triggers/             # Webhooks & schedules
 │
 ├── helm/                         # Helm Charts
 │   └── charts/
@@ -253,6 +296,7 @@ om/
 | Layer | Technologies |
 |-------|-------------|
 | **Self-Service Portal** | Backstage (CNCF) |
+| **Workflow Automation** | n8n (approvals, onboarding, alerts) |
 | **Infrastructure** | Terraform, AWS EKS |
 | **GitOps** | ArgoCD, ApplicationSets |
 | **Deployments** | Helm, Kustomize |
@@ -272,6 +316,8 @@ om/
 | [Runbooks](docs/runbooks/README.md) | Operational procedures |
 | [Roadmap](docs/ROADMAP.md) | Implementation phases |
 | [Portal Architecture](platform/portal/ARCHITECTURE.md) | Backstage design |
+| [Workflow Automation](platform/n8n/README.md) | n8n workflows |
+| [Event System](platform/events/README.md) | Event-driven architecture |
 
 ### Tutorials
 

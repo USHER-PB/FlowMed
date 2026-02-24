@@ -1,0 +1,128 @@
+# =============================================================================
+# Platform Webhook Endpoints
+# =============================================================================
+# Defines all webhook endpoints for the platform event system.
+# =============================================================================
+
+webhooks:
+  # ===========================================================================
+  # n8n Workflow Webhooks
+  # ===========================================================================
+
+  # ArgoCD Events
+  - name: argocd-sync-hook
+    url: https://n8n.platform.example.com/webhook/argocd-sync-hook
+    description: ArgoCD sync events for approval workflow
+    events:
+      - argocd.sync.requested
+      - argocd.sync.running
+    authentication:
+      type: header
+      header: X-Webhook-Secret
+      secretRef:
+        name: n8n-webhook-secrets
+        key: argocd-secret
+
+  - name: argocd-status
+    url: https://n8n.platform.example.com/webhook/argocd-status
+    description: ArgoCD application status updates
+    events:
+      - argocd.sync.succeeded
+      - argocd.sync.failed
+      - argocd.health.degraded
+    authentication:
+      type: header
+      header: X-Webhook-Secret
+      secretRef:
+        name: n8n-webhook-secrets
+        key: argocd-secret
+
+  # Alertmanager Events
+  - name: alertmanager-webhook
+    url: https://n8n.platform.example.com/webhook/alertmanager-webhook
+    description: Prometheus/Alertmanager alerts
+    events:
+      - alertmanager.alert.firing
+      - alertmanager.alert.resolved
+    authentication:
+      type: basic
+      secretRef:
+        name: n8n-webhook-secrets
+        key: alertmanager-auth
+
+  # Team Onboarding
+  - name: team-onboarding
+    url: https://n8n.platform.example.com/webhook/team-onboarding
+    description: GitHub team onboarding issue events
+    events:
+      - github.issue.labeled
+    authentication:
+      type: header
+      header: X-Hub-Signature-256
+      secretRef:
+        name: github-webhook-secret
+        key: secret
+
+  # Service Catalog
+  - name: service-request
+    url: https://n8n.platform.example.com/webhook/service-request
+    description: Service provisioning requests
+    events:
+      - servicerequest.created
+      - servicerequest.updated
+    authentication:
+      type: header
+      header: X-Webhook-Secret
+      secretRef:
+        name: n8n-webhook-secrets
+        key: k8s-secret
+
+  # Slack Interactions
+  - name: slack-interaction
+    url: https://n8n.platform.example.com/webhook/slack-interaction
+    description: Slack button interactions (approvals)
+    events:
+      - slack.interaction.button
+    authentication:
+      type: slack-signature
+      secretRef:
+        name: slack-secrets
+        key: signing-secret
+
+  # ===========================================================================
+  # External Service Webhooks
+  # ===========================================================================
+
+  # PagerDuty (outgoing)
+  - name: pagerduty-events
+    url: https://events.pagerduty.com/v2/enqueue
+    description: PagerDuty event API
+    type: outgoing
+    authentication:
+      type: header
+      header: Authorization
+      value: "Token token=${PAGERDUTY_TOKEN}"
+
+  # Jira (outgoing)
+  - name: jira-issues
+    url: https://your-org.atlassian.net/rest/api/3/issue
+    description: Jira issue creation
+    type: outgoing
+    authentication:
+      type: basic
+      secretRef:
+        name: jira-secrets
+        key: auth
+
+---
+# Webhook secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: n8n-webhook-secrets
+  namespace: platform
+type: Opaque
+stringData:
+  argocd-secret: "${ARGOCD_WEBHOOK_SECRET}"
+  alertmanager-auth: "${ALERTMANAGER_WEBHOOK_AUTH}"
+  k8s-secret: "${K8S_WEBHOOK_SECRET}"

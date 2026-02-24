@@ -1,0 +1,188 @@
+# =============================================================================
+# ArgoCD Event Handlers
+# =============================================================================
+# Configuration for handling ArgoCD application events.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: om-platform
+data:
+  # ==========================================================================
+  # Triggers
+  # ==========================================================================
+
+  # Production deployment requires approval
+  trigger.on-prod-sync-requested: |
+    - when: app.metadata.namespace matches '.*-prod$' && app.status.operationState.phase == 'Running'
+      oncePer: app.status.operationState.syncResult.revision
+      send: [prod-approval-request]
+
+  # Sync succeeded
+  trigger.on-sync-succeeded: |
+    - when: app.status.operationState.phase == 'Succeeded'
+      oncePer: app.status.operationState.syncResult.revision
+      send: [sync-succeeded]
+
+  # Sync failed
+  trigger.on-sync-failed: |
+    - when: app.status.operationState.phase == 'Failed'
+      oncePer: app.status.operationState.syncResult.revision
+      send: [sync-failed]
+
+  # Health degraded
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      oncePer: app.status.health.status
+      send: [health-degraded]
+
+  # ==========================================================================
+  # Services (Notification Targets)
+  # ==========================================================================
+
+  # n8n Workflow Engine
+  service.webhook.n8n-approval: |
+    url: https://n8n.platform.example.com/webhook/argocd-sync-hook
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: X-Event-Type
+        value: sync-requested
+
+  service.webhook.n8n-status: |
+    url: https://n8n.platform.example.com/webhook/argocd-status
+    headers:
+      - name: Content-Type
+        value: application/json
+
+  # Slack (direct notifications for non-approval events)
+  service.slack: |
+    token: $slack-token
+
+  # ==========================================================================
+  # Templates
+  # ==========================================================================
+
+  template.prod-approval-request: |
+    webhook:
+      n8n-approval:
+        method: POST
+        body: |
+          {
+            "event": "sync-requested",
+            "app": {
+              "name": "{{.app.metadata.name}}",
+              "namespace": "{{.app.metadata.namespace}}",
+              "project": "{{.app.spec.project}}",
+              "repoURL": "{{.app.spec.source.repoURL}}",
+              "targetRevision": "{{.app.spec.source.targetRevision}}",
+              "path": "{{.app.spec.source.path}}"
+            },
+            "sync": {
+              "revision": "{{.app.status.operationState.syncResult.revision}}",
+              "initiatedBy": "{{.app.status.operationState.operation.initiatedBy.username}}"
+            }
+          }
+
+  template.sync-succeeded: |
+    webhook:
+      n8n-status:
+        method: POST
+        body: |
+          {
+            "event": "sync-succeeded",
+            "app": {
+              "name": "{{.app.metadata.name}}",
+              "namespace": "{{.app.metadata.namespace}}"
+            },
+            "sync": {
+              "revision": "{{.app.status.operationState.syncResult.revision}}",
+              "finishedAt": "{{.app.status.operationState.finishedAt}}"
+            }
+          }
+    slack:
+      attachments: |
+        [{
+          "color": "good",
+          "title": "✅ {{.app.metadata.name}} synced successfully",
+          "fields": [
+            {"title": "Namespace", "value": "{{.app.metadata.namespace}}", "short": true},
+            {"title": "Revision", "value": "{{.app.status.operationState.syncResult.revision | substr 0 7}}", "short": true}
+          ]
+        }]
+
+  template.sync-failed: |
+    webhook:
+      n8n-status:
+        method: POST
+        body: |
+          {
+            "event": "sync-failed",
+            "app": {
+              "name": "{{.app.metadata.name}}",
+              "namespace": "{{.app.metadata.namespace}}"
+            },
+            "error": "{{.app.status.operationState.message}}"
+          }
+    slack:
+      attachments: |
+        [{
+          "color": "danger",
+          "title": "❌ {{.app.metadata.name}} sync failed",
+          "fields": [
+            {"title": "Namespace", "value": "{{.app.metadata.namespace}}", "short": true},
+            {"title": "Error", "value": "{{.app.status.operationState.message}}", "short": false}
+          ]
+        }]
+
+  template.health-degraded: |
+    webhook:
+      n8n-status:
+        method: POST
+        body: |
+          {
+            "event": "health-degraded",
+            "app": {
+              "name": "{{.app.metadata.name}}",
+              "namespace": "{{.app.metadata.namespace}}"
+            },
+            "health": {
+              "status": "{{.app.status.health.status}}",
+              "message": "{{.app.status.health.message}}"
+            }
+          }
+    slack:
+      attachments: |
+        [{
+          "color": "warning",
+          "title": "⚠️ {{.app.metadata.name}} health degraded",
+          "fields": [
+            {"title": "Namespace", "value": "{{.app.metadata.namespace}}", "short": true},
+            {"title": "Status", "value": "{{.app.status.health.status}}", "short": true}
+          ]
+        }]
+
+---
+# Subscription to triggers
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-subscriptions
+  namespace: argocd
+data:
+  # Default subscriptions for all apps
+  subscriptions: |
+    - recipients:
+        - slack:platform-deployments
+      triggers:
+        - on-sync-succeeded
+        - on-sync-failed
+        - on-health-degraded
+    - recipients:
+        - webhook:n8n-approval
+      triggers:
+        - on-prod-sync-requested

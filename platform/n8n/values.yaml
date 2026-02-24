@@ -1,0 +1,119 @@
+# =============================================================================
+# n8n Helm Values for OM Platform
+# =============================================================================
+# Configuration for n8n workflow automation deployment.
+# =============================================================================
+
+replicaCount: 1
+
+image:
+  repository: n8nio/n8n
+  tag: "1.24.1"
+  pullPolicy: IfNotPresent
+
+# n8n configuration
+config:
+  # Basic auth for UI
+  basicAuth:
+    active: true
+    user: admin
+    # Password from secret
+
+  # Encryption key for credentials (from secret)
+  encryptionKey: ""
+
+  # Webhook URL
+  webhookUrl: https://n8n.platform.example.com
+
+  # Execution settings
+  executions:
+    pruneData: true
+    pruneDataMaxAge: 336  # 14 days in hours
+
+  # Database (PostgreSQL recommended for production)
+  database:
+    type: postgresdb
+    postgresdb:
+      host: n8n-postgresql
+      port: 5432
+      database: n8n
+      user: n8n
+      # Password from secret
+
+# Resources
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Persistence for file-based workflows
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: gp3
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 5678
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: n8n.platform.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - n8n.platform.example.com
+
+# Service account with RBAC
+serviceAccount:
+  create: true
+  annotations:
+    # IRSA for AWS access
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/n8n-role
+
+# PostgreSQL subchart
+postgresql:
+  enabled: true
+  auth:
+    username: n8n
+    database: n8n
+    existingSecret: n8n-postgresql-secret
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# Pod security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # n8n needs write access
+  capabilities:
+    drop:
+      - ALL
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

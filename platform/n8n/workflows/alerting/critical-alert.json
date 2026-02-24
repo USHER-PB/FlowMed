@@ -1,0 +1,203 @@
+{
+  "name": "Critical Alert Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alertmanager-webhook",
+        "responseMode": "onReceived"
+      },
+      "name": "Alertmanager Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"status\"]}}",
+              "value2": "firing"
+            }
+          ]
+        }
+      },
+      "name": "Is Firing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerts = $input.item.json.body.alerts;\nconst results = [];\n\nfor (const alert of alerts) {\n  const severity = alert.labels.severity || 'unknown';\n  const namespace = alert.labels.namespace || 'unknown';\n  const alertname = alert.labels.alertname || 'Unknown Alert';\n  \n  // Get team from namespace\n  const team = namespace.split('-')[0];\n  \n  // Build runbook URL\n  const runbookUrl = `https://github.com/skyengpro/om/blob/main/docs/runbooks/README.md#${alertname.toLowerCase()}`;\n  \n  results.push({\n    alertname,\n    severity,\n    namespace,\n    team,\n    summary: alert.annotations?.summary || alertname,\n    description: alert.annotations?.description || 'No description',\n    runbookUrl,\n    startsAt: alert.startsAt,\n    labels: alert.labels\n  });\n}\n\nreturn results;"
+      },
+      "name": "Parse Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.severity}}",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "name": "Is Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "resource": "incident",
+        "operation": "create",
+        "title": "={{$json.alertname}}: {{$json.summary}}",
+        "serviceId": "PLATFORM_SERVICE_ID",
+        "urgency": "high",
+        "body": "=**Alert:** {{$json.alertname}}\n**Namespace:** {{$json.namespace}}\n**Team:** {{$json.team}}\n\n{{$json.description}}\n\n**Runbook:** {{$json.runbookUrl}}"
+      },
+      "name": "Create PagerDuty Incident",
+      "type": "n8n-nodes-base.pagerDuty",
+      "typeVersion": 1,
+      "position": [1050, 100],
+      "credentials": {
+        "pagerDutyApi": {
+          "id": "5",
+          "name": "PagerDuty"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#platform-critical",
+        "text": "=:rotating_light: *CRITICAL ALERT*\n\n*Alert:* {{$json.alertname}}\n*Namespace:* `{{$json.namespace}}`\n*Team:* {{$json.team}}\n\n*Summary:* {{$json.summary}}\n\n*Description:*\n{{$json.description}}\n\n<{{$json.runbookUrl}}|:book: Runbook>",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "name": "Slack Critical Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1050, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "=#team-{{$json.team}}",
+        "text": "=:warning: *Alert: {{$json.alertname}}*\n\n*Namespace:* `{{$json.namespace}}`\n*Severity:* {{$json.severity}}\n\n{{$json.summary}}\n\n<{{$json.runbookUrl}}|:book: View Runbook>"
+      },
+      "name": "Slack Warning Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1050, 350],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#platform-alerts",
+        "text": "=:white_check_mark: *Alert Resolved*\n\n*Alert:* {{$json[\"body\"][\"alerts\"][0][\"labels\"][\"alertname\"]}}\n*Namespace:* `{{$json[\"body\"][\"alerts\"][0][\"labels\"][\"namespace\"]}}`"
+      },
+      "name": "Notify Resolved",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [650, 400],
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack Platform Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alertmanager Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Firing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Firing?": {
+      "main": [
+        [
+          {
+            "node": "Parse Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Resolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Alerts": {
+      "main": [
+        [
+          {
+            "node": "Is Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Critical?": {
+      "main": [
+        [
+          {
+            "node": "Create PagerDuty Incident",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Warning Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "alerting"
+    },
+    {
+      "name": "critical"
+    }
+  ]
+}
