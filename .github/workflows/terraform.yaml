@@ -1,7 +1,8 @@
 # =============================================================================
 # Terraform CI/CD Pipeline
 # =============================================================================
-# This workflow validates, plans, and applies Terraform configurations.
+# This workflow validates and plans Terraform configurations.
+# Works with GitHub Free accounts.
 # =============================================================================
 
 name: Terraform
@@ -38,14 +39,11 @@ on:
         options:
           - plan
           - apply
-          - destroy
 
 env:
   TF_VERSION: "1.6.6"
-  AWS_REGION: "us-east-1"
 
 permissions:
-  id-token: write
   contents: read
   pull-requests: write
 
@@ -77,7 +75,7 @@ jobs:
             cd "$dir"
             terraform init -backend=false
             terraform validate
-            cd -
+            cd - > /dev/null
           done
 
   # =============================================================================
@@ -99,120 +97,128 @@ jobs:
           soft_fail: true
 
   # =============================================================================
-  # Terraform Plan
+  # Terraform Plan (Validation Only - No AWS Required)
+  # =============================================================================
+  plan-validate:
+    name: Plan Validation
+    runs-on: ubuntu-latest
+    needs: [validate, security]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Check AWS Configuration
+        id: aws-check
+        run: |
+          if [ -n "${{ secrets.AWS_ROLE_ARN }}" ] || [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::notice::AWS credentials not configured. Running validation only."
+          fi
+
+      - name: Terraform Init (Validation Mode)
+        run: |
+          for env in dev staging prod; do
+            if [ -d "terraform/environments/$env" ]; then
+              echo "Initializing $env environment..."
+              cd "terraform/environments/$env"
+              terraform init -backend=false
+              cd - > /dev/null
+            fi
+          done
+
+      - name: Terraform Validate All Environments
+        run: |
+          for env in dev staging prod; do
+            if [ -d "terraform/environments/$env" ]; then
+              echo "=== Validating $env ==="
+              cd "terraform/environments/$env"
+              terraform validate
+              cd - > /dev/null
+            fi
+          done
+
+      - name: Summary
+        run: |
+          echo "## Terraform Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Format check, security scan, and validation completed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.aws-check.outputs.configured }}" != "true" ]; then
+            echo "**Note:** AWS credentials not configured. To enable full plan/apply:" >> $GITHUB_STEP_SUMMARY
+            echo "- Set \`AWS_ROLE_ARN\` secret for OIDC authentication, OR" >> $GITHUB_STEP_SUMMARY
+            echo "- Set \`AWS_ACCESS_KEY_ID\` and \`AWS_SECRET_ACCESS_KEY\` secrets" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # =============================================================================
+  # Terraform Plan (With AWS - Optional)
   # =============================================================================
   plan:
     name: Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
     needs: [validate, security]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && vars.ENABLE_AWS_PLAN == 'true')
 
     strategy:
       matrix:
         environment: [dev]
       fail-fast: false
 
-    environment: ${{ matrix.environment }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check AWS Configuration
+        id: aws-check
+        run: |
+          if [ -n "${{ secrets.AWS_ROLE_ARN }}" ]; then
+            echo "method=oidc" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "method=keys" >> $GITHUB_OUTPUT
+          else
+            echo "method=none" >> $GITHUB_OUTPUT
+            echo "::error::AWS credentials not configured"
+            exit 1
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
+        if: steps.aws-check.outputs.method == 'oidc'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Configure AWS Credentials (Keys)
+        if: steps.aws-check.outputs.method == 'keys'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
       - name: Terraform Init
         run: terraform init
         working-directory: terraform/environments/${{ matrix.environment }}
 
       - name: Terraform Plan
-        id: plan
-        run: |
-          terraform plan -no-color -out=tfplan 2>&1 | tee plan.txt
-          echo "plan<<EOF" >> $GITHUB_OUTPUT
-          cat plan.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        run: terraform plan -no-color -out=tfplan
         working-directory: terraform/environments/${{ matrix.environment }}
-        continue-on-error: true
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ matrix.environment }}
           path: terraform/environments/${{ matrix.environment }}/tfplan
-
-      - name: Comment Plan on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const output = `#### Terraform Plan - ${{ matrix.environment }} 📖
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${{ steps.plan.outputs.plan }}
-            \`\`\`
-
-            </details>
-
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            });
-
-      - name: Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
-
-  # =============================================================================
-  # Terraform Apply (Manual Trigger Only)
-  # =============================================================================
-  apply:
-    name: Apply (${{ github.event.inputs.environment || 'dev' }})
-    runs-on: ubuntu-latest
-    needs: plan
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'
-
-    environment:
-      name: ${{ github.event.inputs.environment }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Download Plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-${{ github.event.inputs.environment }}
-          path: terraform/environments/${{ github.event.inputs.environment }}
-
-      - name: Terraform Init
-        run: terraform init
-        working-directory: terraform/environments/${{ github.event.inputs.environment }}
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+          retention-days: 7
