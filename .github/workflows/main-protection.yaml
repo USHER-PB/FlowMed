@@ -27,7 +27,7 @@ jobs:
   # =============================================================================
   detect-direct-push:
     name: Detect Direct Push
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check if PR Merge
@@ -112,7 +112,7 @@ jobs:
   # =============================================================================
   check-signature:
     name: Check Commit Signature
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check GPG Signature

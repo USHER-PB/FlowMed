@@ -34,7 +34,7 @@ jobs:
   # ===========================================================================
   release-please:
     name: Release Please
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'auto' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -74,7 +74,7 @@ jobs:
   # ===========================================================================
   post-release:
     name: Post-Release Actions
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
 
@@ -149,7 +149,7 @@ jobs:
   # ===========================================================================
   manual-release:
     name: Manual Release
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_type != 'auto' }}
 
     steps:
