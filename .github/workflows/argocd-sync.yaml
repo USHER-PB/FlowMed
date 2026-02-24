@@ -35,7 +35,7 @@ jobs:
   # =============================================================================
   check-config:
     name: Check Configuration
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       configured: ${{ steps.check.outputs.configured }}
 
@@ -62,7 +62,7 @@ jobs:
   # =============================================================================
   validate:
     name: Validate Manifests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -110,7 +110,7 @@ jobs:
   # =============================================================================
   detect-changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [check-config, validate]
     if: needs.check-config.outputs.configured == 'true'
     outputs:
@@ -173,7 +173,7 @@ jobs:
   # =============================================================================
   sync:
     name: Sync
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [check-config, detect-changes]
     if: needs.check-config.outputs.configured == 'true' && needs.detect-changes.outputs.has_changes == 'true'
 
