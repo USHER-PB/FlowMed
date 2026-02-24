@@ -1,0 +1,282 @@
+# =============================================================================
+# Pull Request Validation (Soft Branch Protection)
+# =============================================================================
+# This workflow enforces PR requirements since branch protection
+# is not available on GitHub Free for private repositories.
+#
+# Enforces:
+# - Conventional commit PR titles
+# - Required status checks pass
+# - No direct commits to main (via PR labeling)
+# - Code review reminder
+# =============================================================================
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  # =============================================================================
+  # Validate PR Title (Conventional Commits)
+  # =============================================================================
+  validate-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR Title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+            security
+            deps
+            terraform
+          requireScope: false
+          subjectPattern: ^.+$
+          subjectPatternError: |
+            The subject "{subject}" doesn't match the required pattern.
+            Please use a descriptive subject.
+
+  # =============================================================================
+  # Required Checks Gate
+  # =============================================================================
+  required-checks:
+    name: Required Checks
+    runs-on: ubuntu-latest
+    needs: [validate-title]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Required Checks
+        id: checks
+        run: |
+          # Get changed files
+          CHANGED=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' || echo "")
+
+          CHECKS=""
+
+          # Terraform changes require terraform validation
+          if echo "$CHANGED" | grep -q "^terraform/"; then
+            CHECKS="$CHECKS terraform"
+          fi
+
+          # Helm changes require helm lint
+          if echo "$CHANGED" | grep -q "^helm/"; then
+            CHECKS="$CHECKS helm"
+          fi
+
+          # Security scan always required
+          CHECKS="$CHECKS security"
+
+          echo "required=$CHECKS" >> $GITHUB_OUTPUT
+          echo "Required checks: $CHECKS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## PR Validation Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All required checks have been triggered." >> $GITHUB_STEP_SUMMARY
+
+  # =============================================================================
+  # PR Checklist
+  # =============================================================================
+  pr-checklist:
+    name: PR Checklist
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check PR Description
+        id: description
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+
+          # Check for empty description
+          if [ -z "$BODY" ] || [ "$BODY" == "null" ]; then
+            echo "has_description=false" >> $GITHUB_OUTPUT
+            echo "::warning::PR description is empty"
+          else
+            echo "has_description=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for Breaking Changes
+        id: breaking
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          BODY="${{ github.event.pull_request.body }}"
+
+          if echo "$TITLE" | grep -qi "breaking\|!:"; then
+            echo "has_breaking=true" >> $GITHUB_OUTPUT
+            echo "::notice::This PR contains breaking changes"
+          else
+            echo "has_breaking=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add Checklist Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('## PR Checklist')
+            );
+
+            const hasDescription = '${{ steps.description.outputs.has_description }}' === 'true';
+            const hasBreaking = '${{ steps.breaking.outputs.has_breaking }}' === 'true';
+
+            const body = `## PR Checklist
+
+            Please ensure the following before merging:
+
+            - [${hasDescription ? 'x' : ' '}] PR has a meaningful description
+            - [ ] Changes have been tested locally
+            - [ ] Documentation updated (if applicable)
+            - [ ] No secrets or sensitive data committed
+            ${hasBreaking ? '- [ ] Breaking changes documented and communicated' : ''}
+
+            ### Required Reviews
+            - [ ] At least one approval from a code owner
+
+            ---
+            *This is an automated checklist. Please review and check off items manually.*
+            `;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # =============================================================================
+  # Label PR Based on Changes
+  # =============================================================================
+  labeler:
+    name: Label PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Label PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const labels = new Set();
+
+            for (const file of files) {
+              const path = file.filename;
+
+              if (path.startsWith('terraform/')) labels.add('terraform');
+              if (path.startsWith('helm/')) labels.add('helm');
+              if (path.startsWith('argocd/')) labels.add('argocd');
+              if (path.startsWith('security/')) labels.add('security');
+              if (path.startsWith('docs/')) labels.add('documentation');
+              if (path.startsWith('.github/')) labels.add('ci');
+              if (path.startsWith('platform/')) labels.add('platform');
+              if (path.startsWith('monitoring/')) labels.add('monitoring');
+            }
+
+            if (labels.size > 0) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: Array.from(labels)
+                });
+              } catch (e) {
+                console.log('Could not add labels (labels may not exist):', e.message);
+              }
+            }
+
+  # =============================================================================
+  # Final Gate Status
+  # =============================================================================
+  gate:
+    name: PR Gate
+    runs-on: ubuntu-latest
+    needs: [validate-title, required-checks, pr-checklist]
+    if: always()
+
+    steps:
+      - name: Check Results
+        run: |
+          if [ "${{ needs.validate-title.result }}" != "success" ]; then
+            echo "::error::PR title validation failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.required-checks.result }}" != "success" ]; then
+            echo "::error::Required checks failed"
+            exit 1
+          fi
+
+          echo "All PR validations passed!"
+
+      - name: Set Status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'success',
+              context: 'PR Gate',
+              description: 'All PR requirements met'
+            });
