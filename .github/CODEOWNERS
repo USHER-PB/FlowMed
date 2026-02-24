@@ -1,0 +1,84 @@
+# =============================================================================
+# CODEOWNERS - Code Ownership for Review Requirements
+# =============================================================================
+# These owners will be requested for review when someone opens a pull request
+# that modifies code that they own.
+#
+# Order matters: later patterns take precedence over earlier ones.
+# =============================================================================
+
+# =============================================================================
+# Default Owners (catch-all)
+# =============================================================================
+# Platform team owns everything by default
+*                                   @skyengpro/platform-team
+
+# =============================================================================
+# Infrastructure (Terraform)
+# =============================================================================
+# Critical infrastructure changes require platform-infra team review
+/terraform/                         @skyengpro/platform-infra
+/terraform/modules/kubernetes/      @skyengpro/platform-infra @skyengpro/security
+/terraform/modules/networking/      @skyengpro/platform-infra @skyengpro/security
+/terraform/environments/prod/       @skyengpro/platform-infra @skyengpro/platform-leads
+
+# =============================================================================
+# Security
+# =============================================================================
+# All security-related changes require security team review
+/security/                          @skyengpro/security
+/security/opa-policies/             @skyengpro/security @skyengpro/platform-leads
+/security/network-policies/         @skyengpro/security @skyengpro/platform-infra
+/security/rbac/                     @skyengpro/security
+
+# =============================================================================
+# Platform Core
+# =============================================================================
+/platform/                          @skyengpro/platform-team
+/platform/tenants/                  @skyengpro/platform-team @skyengpro/security
+/platform/quotas/                   @skyengpro/platform-team
+/platform/service-catalog/          @skyengpro/platform-team
+/platform/portal/                   @skyengpro/platform-team
+/platform/n8n/                      @skyengpro/platform-team
+/platform/events/                   @skyengpro/platform-team
+
+# =============================================================================
+# GitOps (ArgoCD)
+# =============================================================================
+/argocd/                            @skyengpro/platform-team
+/argocd/bootstrap/                  @skyengpro/platform-infra @skyengpro/platform-leads
+/argocd/apps/infrastructure/        @skyengpro/platform-infra
+
+# =============================================================================
+# Helm Charts
+# =============================================================================
+/helm/                              @skyengpro/platform-team
+/helm/charts/base-app/              @skyengpro/platform-team
+
+# =============================================================================
+# Monitoring & Observability
+# =============================================================================
+/monitoring/                        @skyengpro/platform-sre
+/monitoring/prometheus/             @skyengpro/platform-sre
+/monitoring/grafana/                @skyengpro/platform-sre
+
+# =============================================================================
+# CI/CD Workflows
+# =============================================================================
+/.github/                           @skyengpro/platform-team
+/.github/workflows/                 @skyengpro/platform-infra @skyengpro/security
+
+# =============================================================================
+# Documentation
+# =============================================================================
+/docs/                              @skyengpro/platform-team
+/docs/architecture/                 @skyengpro/platform-leads
+/docs/runbooks/                     @skyengpro/platform-sre
+
+# =============================================================================
+# Critical Files (Require Lead Approval)
+# =============================================================================
+SECURITY.md                         @skyengpro/security @skyengpro/platform-leads
+CODEOWNERS                          @skyengpro/platform-leads
+.github/CODEOWNERS                  @skyengpro/platform-leads
+LICENSE                             @skyengpro/platform-leads

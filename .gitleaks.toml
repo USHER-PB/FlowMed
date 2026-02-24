@@ -1,0 +1,72 @@
+# =============================================================================
+# Gitleaks Configuration
+# =============================================================================
+# Secret detection rules for pre-commit and CI/CD.
+# https://github.com/gitleaks/gitleaks
+# =============================================================================
+
+title = "OM Platform Gitleaks Configuration"
+
+[extend]
+# Use the default gitleaks config as a base
+useDefault = true
+
+# =============================================================================
+# Custom Rules
+# =============================================================================
+
+[[rules]]
+id = "kubernetes-secret"
+description = "Kubernetes Secret (base64 encoded)"
+regex = '''(?i)(kubernetes|k8s).{0,20}(secret|password|token).{0,20}[:=]\s*['"]?([A-Za-z0-9+/]{20,}={0,2})['"]?'''
+keywords = ["kubernetes", "k8s", "secret"]
+
+[[rules]]
+id = "terraform-sensitive"
+description = "Terraform sensitive variable"
+regex = '''(?i)(password|secret|token|api_key|apikey|access_key|secret_key)\s*=\s*"[^"${\n]{8,}"'''
+keywords = ["password", "secret", "token", "api_key", "access_key"]
+
+[[rules]]
+id = "helm-secret"
+description = "Helm chart secret value"
+regex = '''(?i)secretKeyRef:\s*\n\s*name:\s*\S+\s*\n\s*key:\s*\S+'''
+keywords = ["secretKeyRef"]
+
+# =============================================================================
+# Allowlist
+# =============================================================================
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+    '''\.terraform\.lock\.hcl$''',
+    '''go\.sum$''',
+    '''package-lock\.json$''',
+    '''yarn\.lock$''',
+    '''\.secrets\.baseline$''',
+]
+regexes = [
+    # Example/placeholder values
+    '''example\.com''',
+    '''placeholder''',
+    '''CHANGE_ME''',
+    '''\$\{[A-Z_]+\}''',  # Environment variable references
+    '''<[A-Z_]+>''',      # Placeholder tokens
+]
+
+# =============================================================================
+# Path-specific Allowlists
+# =============================================================================
+
+[[rules]]
+id = "docs-example"
+description = "Documentation examples"
+path = '''docs/'''
+allowlist = { regexes = ['''.*'''] }
+
+[[rules]]
+id = "test-fixtures"
+description = "Test fixtures"
+path = '''test/'''
+allowlist = { regexes = ['''.*'''] }

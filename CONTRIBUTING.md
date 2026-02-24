@@ -8,9 +8,10 @@ Thank you for your interest in contributing to the OM Platform! This document pr
 2. [Getting Started](#getting-started)
 3. [How to Contribute](#how-to-contribute)
 4. [Development Workflow](#development-workflow)
-5. [Coding Standards](#coding-standards)
-6. [Testing](#testing)
-7. [Documentation](#documentation)
+5. [Security](#security)
+6. [Coding Standards](#coding-standards)
+7. [Testing](#testing)
+8. [Documentation](#documentation)
 
 ## Code of Conduct
 
@@ -111,6 +112,61 @@ docs(getting-started): add troubleshooting section
 3. Ensure CI passes
 4. Get at least one review
 5. Squash and merge
+
+## Security
+
+### Security Policy
+
+Please read our [SECURITY.md](SECURITY.md) for:
+
+- Vulnerability reporting procedures
+- Security best practices
+- Compliance requirements
+
+### Pre-commit Hooks
+
+We use pre-commit hooks to catch issues early:
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+pre-commit install --hook-type commit-msg
+
+# Run all hooks manually
+pre-commit run --all-files
+```
+
+Hooks include:
+
+- **Gitleaks**: Secret detection
+- **detect-secrets**: Additional secret scanning
+- **tfsec/checkov**: Terraform security scanning
+- **kube-linter**: Kubernetes security checks
+- **shellcheck**: Shell script analysis
+
+### Secrets
+
+- **NEVER** commit secrets, API keys, or credentials
+- Use environment variables or secret managers
+- Use placeholder values like `${VAR_NAME}` or `<CHANGE_ME>`
+- If you accidentally commit a secret, notify the security team immediately
+
+### Signed Commits
+
+All commits must be signed:
+
+```bash
+# Configure GPG signing
+git config --global commit.gpgsign true
+git config --global user.signingkey YOUR_KEY_ID
+
+# Or use SSH signing (GitHub)
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+```
 
 ## Coding Standards
 

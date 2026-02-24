@@ -1,0 +1,206 @@
+# =============================================================================
+# Release Workflow
+# =============================================================================
+# Automates releases with changelog generation using Release Please.
+# Follows Conventional Commits for version bumping and changelog entries.
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (major, minor, patch)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ===========================================================================
+  # Release Please - Automated Release Management
+  # ===========================================================================
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Release Please
+        id: release
+        uses: google-github-actions/release-please-action@v4
+        with:
+          release-type: simple
+          package-name: om-platform
+          changelog-types: |
+            [
+              {"type": "feat", "section": "Features", "hidden": false},
+              {"type": "fix", "section": "Bug Fixes", "hidden": false},
+              {"type": "perf", "section": "Performance Improvements", "hidden": false},
+              {"type": "revert", "section": "Reverts", "hidden": false},
+              {"type": "docs", "section": "Documentation", "hidden": false},
+              {"type": "style", "section": "Styles", "hidden": true},
+              {"type": "chore", "section": "Miscellaneous", "hidden": true},
+              {"type": "refactor", "section": "Code Refactoring", "hidden": false},
+              {"type": "test", "section": "Tests", "hidden": true},
+              {"type": "build", "section": "Build System", "hidden": true},
+              {"type": "ci", "section": "Continuous Integration", "hidden": true},
+              {"type": "security", "section": "Security", "hidden": false},
+              {"type": "terraform", "section": "Infrastructure", "hidden": false},
+              {"type": "deps", "section": "Dependencies", "hidden": false}
+            ]
+          extra-files: |
+            README.md
+          include-v-in-tag: true
+
+  # ===========================================================================
+  # Post-Release Actions
+  # ===========================================================================
+  post-release:
+    name: Post-Release Actions
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+
+      - name: Generate Release Notes Summary
+        id: notes
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+
+          echo "## Release ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${TAG}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Release Page](https://github.com/${{ github.repository }}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Slack
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "New OM Platform Release: ${{ needs.release-please.outputs.tag_name }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "OM Platform Release ${{ needs.release-please.outputs.version }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ needs.release-please.outputs.version }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Tag:*\n${{ needs.release-please.outputs.tag_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Release"
+                      },
+                      "url": "https://github.com/${{ github.repository }}/releases/tag/${{ needs.release-please.outputs.tag_name }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Changelog"
+                      },
+                      "url": "https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ===========================================================================
+  # Manual Release (if workflow_dispatch with release_type)
+  # ===========================================================================
+  manual-release:
+    name: Manual Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_type != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install standard-version
+        run: npm install -g standard-version
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version and generate changelog
+        run: |
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+          standard-version --release-as $RELEASE_TYPE
+
+      - name: Push changes
+        run: |
+          git push --follow-tags origin main
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(cat package.json 2>/dev/null | jq -r .version || git describe --tags --abbrev=0 | sed 's/^v//')
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes-file CHANGELOG.md \
+            --generate-notes

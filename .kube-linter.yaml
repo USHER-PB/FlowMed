@@ -1,0 +1,71 @@
+# =============================================================================
+# KubeLinter Configuration
+# =============================================================================
+# Static analysis for Kubernetes YAML files and Helm charts.
+# https://github.com/stackrox/kube-linter
+# =============================================================================
+
+checks:
+  # Include all default checks
+  addAllBuiltIn: true
+
+  # Exclude specific checks if needed
+  exclude:
+    - "unset-cpu-requirements"  # Allow flexible CPU for dev environments
+    - "unset-memory-requirements"  # Allow flexible memory for dev environments
+
+  # Include additional checks
+  include:
+    - "access-to-create-pods"
+    - "cluster-admin-role-binding"
+    - "default-service-account"
+    - "deprecated-service-account-field"
+    - "docker-sock"
+    - "drop-net-raw-capability"
+    - "env-var-secret"
+    - "exposed-services"
+    - "host-ipc"
+    - "host-network"
+    - "host-pid"
+    - "latest-tag"
+    - "minimum-three-replicas"
+    - "mismatching-selector"
+    - "no-anti-affinity"
+    - "no-extensions-v1beta"
+    - "no-liveness-probe"
+    - "no-read-only-root-fs"
+    - "no-readiness-probe"
+    - "non-existent-service-account"
+    - "privilege-escalation-container"
+    - "privileged-container"
+    - "privileged-ports"
+    - "read-secret-from-env-var"
+    - "run-as-non-root"
+    - "sensitive-host-mounts"
+    - "ssh-port"
+    - "unsafe-proc-mount"
+    - "unsafe-sysctls"
+    - "wildcard-in-rules"
+    - "writable-host-mount"
+
+customChecks:
+  # Custom check for platform-specific requirements
+  - name: "platform-labels"
+    template: "required-label"
+    params:
+      key: "app.kubernetes.io/part-of"
+    remediation: "Add 'app.kubernetes.io/part-of' label to identify the application"
+
+  - name: "team-label"
+    template: "required-label"
+    params:
+      key: "team"
+    remediation: "Add 'team' label to identify the owning team"
+    scope:
+      objectKinds:
+        - DeploymentLike
+
+ignorePaths:
+  - "test/**"
+  - "**/testdata/**"
+  - "charts/**/templates/tests/**"

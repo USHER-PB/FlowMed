@@ -1,0 +1,149 @@
+# =============================================================================
+# Dependabot Configuration
+# =============================================================================
+# Automated dependency updates for security and maintenance.
+# https://docs.github.com/en/code-security/dependabot
+# =============================================================================
+
+version: 2
+
+registries:
+  # Add private registries here if needed
+  # dockerhub:
+  #   type: docker-registry
+  #   url: https://registry.hub.docker.com
+  #   username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #   password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+updates:
+  # ==========================================================================
+  # GitHub Actions
+  # ==========================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    reviewers:
+      - "skyengpro/platform-infra"
+    open-pull-requests-limit: 5
+
+  # ==========================================================================
+  # Terraform Providers
+  # ==========================================================================
+  - package-ecosystem: "terraform"
+    directory: "/terraform/modules/kubernetes"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "terraform"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "terraform"
+    reviewers:
+      - "skyengpro/platform-infra"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "terraform"
+    directory: "/terraform/modules/networking"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "terraform"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "terraform"
+    reviewers:
+      - "skyengpro/platform-infra"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "terraform"
+    directory: "/terraform/environments/dev"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "terraform"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "terraform"
+    reviewers:
+      - "skyengpro/platform-infra"
+    open-pull-requests-limit: 3
+
+  # ==========================================================================
+  # Docker Images (via Dockerfile comments)
+  # ==========================================================================
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "skyengpro/platform-team"
+    open-pull-requests-limit: 5
+
+  # ==========================================================================
+  # Backstage (npm)
+  # ==========================================================================
+  - package-ecosystem: "npm"
+    directory: "/platform/portal/backstage"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "backstage"
+    reviewers:
+      - "skyengpro/platform-team"
+    open-pull-requests-limit: 10
+    groups:
+      backstage-core:
+        patterns:
+          - "@backstage/*"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Ignore major version updates for critical packages (review manually)
+      - dependency-name: "@backstage/core-*"
+        update-types: ["version-update:semver-major"]
