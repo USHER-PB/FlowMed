@@ -109,6 +109,6 @@ The platform is designed to support:
 
 ## Security Contacts
 
-- **Security Team**: security@example.com
+- **Security Team**: security@skyengpro.com
 - **On-Call**: PagerDuty (platform-security)
 - **Slack**: #platform-security

@@ -24,7 +24,7 @@ body:
     attributes:
       label: Team Lead
       description: Name and email of the team lead
-      placeholder: John Doe (john.doe@example.com)
+      placeholder: John Doe (john.doe@skyengpro.com)
     validations:
       required: true
 

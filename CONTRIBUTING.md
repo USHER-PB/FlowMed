@@ -304,6 +304,6 @@ docs/
 
 - Open a GitHub issue
 - Join #platform-support on Slack
-- Email platform@example.com
+- Email platform@skyengpro.com
 
 Thank you for contributing!
