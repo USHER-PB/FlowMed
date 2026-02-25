@@ -10,7 +10,7 @@
 
 ## Overview
 
-OM (Operation and Maintenance) is a **central SRE/Platform Engineering platform** that enables development teams to:
+OM (Operation and Maintenance) is a **central SRE Engineering platform** that enables development teams to:
 
 - **Self-onboard** to the platform via a developer portal
 - **Deploy applications** using standardized templates
