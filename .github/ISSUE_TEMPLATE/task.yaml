@@ -1,0 +1,140 @@
+name: Task
+description: Standard task for OM Platform implementation and delivery
+title: "[TASK] "
+labels: ["task", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please complete all relevant sections to ensure clarity and efficient execution.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is this task related to?
+      options:
+        - Terraform
+        - Helm Charts
+        - ArgoCD
+        - Monitoring (Prometheus/Grafana)
+        - Security (OPA/Wazuh)
+        - CI/CD (GitHub Actions)
+        - Backend
+        - Frontend
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: estimation
+    attributes:
+      label: Estimation (Story Points)
+      description: Select estimated effort
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Indicate the urgency of this task
+      options:
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / Background
+      description: Provide background information explaining why this task is needed
+      placeholder: Describe the business or technical context...
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Clearly describe what needs to be implemented or done
+      placeholder: Detail the expected work and scope...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Define the conditions that must be met for this task to be accepted
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition_of_done
+    attributes:
+      label: Definition of Done (DoD)
+      description: Checklist to confirm the task is fully completed
+      placeholder: |
+        - [ ] Code implemented and reviewed
+        - [ ] Tests written and passing
+        - [ ] Documentation updated
+        - [ ] Deployed to appropriate environment
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies / Blockers
+      description: List any dependencies or blocking issues
+      placeholder: e.g. Depends on #123 or API readiness
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks & Assumptions
+      description: Highlight any risks or assumptions
+      placeholder: |
+        Risks:
+        - Risk 1
+
+        Assumptions:
+        - Assumption 1
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing Instructions
+      description: Describe how this task should be tested/validated
+      placeholder: |
+        - Steps to test
+        - Expected results
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Task scope is clearly defined
+          required: true
+        - label: Acceptance criteria are complete
+          required: true
+        - label: Dependencies have been identified
+          required: false
