@@ -40,10 +40,14 @@ This document outlines the implementation roadmap for the OM (Operation and Main
 - [#12 - Deploy EKS cluster](https://github.com/skyengpro/om/issues/12)
 
 ### Success Criteria
-- [ ] EKS cluster is running and accessible
-- [ ] kubectl can connect to the cluster
-- [ ] All infrastructure is defined in Terraform
+- [ ] Proxmox cluster is running and accessible (Version 9.1.1)
+- [ ] Talos k8s cluster is running and accessible (Version 1.33.x)
+- [ ] OpenStack cluster is running and accessible (Version 2025.2.x)
+- [ ] Netbird cluster is running and accessible (Version Management-0.67.1, Dashboard-2.36.0)
+- [ ] ArgoCD, Grafana, Prometheus, Alertmanager, Loki, Alloy, tempo, mimir, pyroscope, metalLB, Nginx ingress Controller, IAM Operator are deploy and running 
+- [ ] All infrastructure is defined with IaC (Ansible, Terraform) 
 - [ ] CI/CD can deploy infrastructure changes
+- [ ] Proxmox VM template for MacOS, Windows and Linux
 
 ---
 
