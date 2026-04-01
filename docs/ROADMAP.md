@@ -42,12 +42,12 @@ This document outlines the implementation roadmap for the OM (Operation and Main
 ### Success Criteria
 - [x] Proxmox cluster is running and accessible (Version 9.1.1)
 - [x] Talos k8s cluster is running and accessible (Version 1.33.x)
-- [60%] OpenStack cluster is running and accessible (Version 2025.2.x)
-- [ ] Netbird cluster is running and accessible (Version Management-0.67.1, Dashboard-2.36.0)
-- [ ] ArgoCD, Grafana, Prometheus, Alertmanager, Loki, Alloy, tempo, mimir, pyroscope, metalLB, Nginx ingress Controller, IAM Operator are deploy and running 
-- [ ] All infrastructure is defined with IaC (Ansible, Terraform) 
-- [ ] CI/CD can deploy infrastructure changes
-- [ ] Proxmox VM template for MacOS, Windows and Linux
+- [ ] 70% -> OpenStack cluster is running and accessible (Version 2025.2.x)
+- [ ] 80% -> Netbird cluster is running and accessible (Version Management-0.67.1, Dashboard-2.36.0)
+- [x] ArgoCD, Grafana, Prometheus, Alertmanager, Loki, Alloy, tempo, mimir, pyroscope, metalLB, Nginx ingress Controller, IAM Operator are deploy and running 
+- [x] All infrastructure is defined with IaC (Ansible, Terraform) 
+- [ ] 70% -> CI/CD can deploy infrastructure changes
+- [ ] 80% -> Proxmox VM template for MacOS, Windows and Linux
 
 ---
 
