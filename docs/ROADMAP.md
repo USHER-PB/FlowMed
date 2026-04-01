@@ -75,7 +75,7 @@ This document outlines the implementation roadmap for the OM (Operation and Main
 - [ ] Backstage is running and accessible
 - [ ] ArgoCD is managing all applications
 - [ ] Custom Monitoring dashboards are accessible
-- [ ] TLS certificates are automatically provisioned
+- [ ] TLS certificates are automatically provisioned and renew
 - [ ] External traffic reaches applications
 - [ ] Netbird agent install script is ready 
 
