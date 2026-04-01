@@ -59,10 +59,14 @@ This document outlines the implementation roadmap for the OM (Operation and Main
 
 | Item | Description | Status |
 |------|-------------|--------|
+| OpenStack Core | VM, Network, and Subcription Management | Planned |
+| OpenStack Services | K8s, Container Services and Plugins | Planned |
+| TLS Provisioning | Automated Certificate Management | Planned |
 | ArgoCD | GitOps continuous delivery | Planned |
 | Monitoring Stack | Prometheus, Grafana, Alertmanager | Planned |
 | cert-manager | Automated TLS certificates | Planned |
 | Ingress NGINX | External traffic routing | Planned |
+| Netbird | Agent Installation script readiness | planned |
 
 ### GitHub Issues
 - [#7 - Phase 2: Platform Components](https://github.com/skyengpro/om/issues/7)
