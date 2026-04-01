@@ -70,10 +70,14 @@ This document outlines the implementation roadmap for the OM (Operation and Main
 - [#14 - Deploy monitoring stack](https://github.com/skyengpro/om/issues/14)
 
 ### Success Criteria
+- [ ] Proxmox operation and maintenance handover to Usher and Onel
+- [ ] Openstack full functional (Subscription, Create resource like VM, Networks, Manager K8s Service, Container Services, Plugins(vault-plugin-secrets-openstack, self-registration-plugins))
+- [ ] Backstage is running and accessible
 - [ ] ArgoCD is managing all applications
-- [ ] Monitoring dashboards are accessible
+- [ ] Custom Monitoring dashboards are accessible
 - [ ] TLS certificates are automatically provisioned
 - [ ] External traffic reaches applications
+- [ ] Netbird agent install script is ready 
 
 ---
 
