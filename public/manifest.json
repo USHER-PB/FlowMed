@@ -1,0 +1,38 @@
+{
+  "name": "HealthMarket Cameroon",
+  "short_name": "HealthMarket",
+  "description": "Connecting patients with healthcare providers across Cameroon",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0d9488",
+  "background_color": "#f9fafb",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "medical"],
+  "shortcuts": [
+    {
+      "name": "My Queue",
+      "url": "/queue",
+      "description": "View your queue position"
+    },
+    {
+      "name": "Book Appointment",
+      "url": "/providers",
+      "description": "Find and book a healthcare provider"
+    }
+  ]
+}

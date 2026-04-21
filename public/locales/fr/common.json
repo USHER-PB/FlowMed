@@ -1,0 +1,63 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "findProvider": "Trouver un prestataire",
+    "history": "Historique",
+    "availability": "Disponibilité",
+    "diagnoses": "Diagnostics"
+  },
+  "auth": {
+    "login": "Se connecter",
+    "register": "S'inscrire",
+    "logout": "Se déconnecter",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "phone": "Numéro de téléphone"
+  },
+  "appointments": {
+    "book": "Prendre rendez-vous",
+    "cancel": "Annuler",
+    "status": {
+      "CONFIRMED": "Confirmé",
+      "PENDING": "En attente",
+      "PENDING_SUPERVISOR_APPROVAL": "En attente d'approbation",
+      "IN_PROGRESS": "En cours",
+      "COMPLETED": "Terminé",
+      "CANCELLED": "Annulé"
+    }
+  },
+  "queue": {
+    "position": "Vous êtes #{{position}} dans la file",
+    "waitTime": "Temps d'attente estimé : {{minutes}} min",
+    "inConsultation": "En consultation",
+    "completed": "Consultation terminée"
+  },
+  "diagnosis": {
+    "diagnosis": "Diagnostic",
+    "prescriptions": "Ordonnances",
+    "recommendations": "Recommandations",
+    "followUp": "Suivi"
+  },
+  "providers": {
+    "tiers": {
+      "TIER_1_DOCTOR": "Médecin agréé",
+      "TIER_2_NURSE": "Infirmier(ère) agréé(e)",
+      "TIER_3_CERTIFIED_WORKER": "Agent de santé certifié",
+      "TIER_4_STUDENT": "Étudiant(e) en médecine",
+      "TIER_5_VOLUNTEER": "Bénévole en santé communautaire"
+    },
+    "verified": "Vérifié",
+    "specialty": "Spécialité",
+    "fee": "Frais de consultation"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "save": "Enregistrer",
+    "submit": "Soumettre",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent"
+  }
+}

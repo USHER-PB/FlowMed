@@ -1,0 +1,63 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "findProvider": "Find a Provider",
+    "history": "History",
+    "availability": "Availability",
+    "diagnoses": "Diagnoses"
+  },
+  "auth": {
+    "login": "Log In",
+    "register": "Register",
+    "logout": "Log Out",
+    "email": "Email Address",
+    "password": "Password",
+    "phone": "Phone Number"
+  },
+  "appointments": {
+    "book": "Book Appointment",
+    "cancel": "Cancel",
+    "status": {
+      "CONFIRMED": "Confirmed",
+      "PENDING": "Pending",
+      "PENDING_SUPERVISOR_APPROVAL": "Pending Approval",
+      "IN_PROGRESS": "In Progress",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "queue": {
+    "position": "You are #{{position}} in line",
+    "waitTime": "Estimated wait time: {{minutes}} min",
+    "inConsultation": "In Consultation",
+    "completed": "Consultation Completed"
+  },
+  "diagnosis": {
+    "diagnosis": "Diagnosis",
+    "prescriptions": "Prescriptions",
+    "recommendations": "Recommendations",
+    "followUp": "Follow-Up"
+  },
+  "providers": {
+    "tiers": {
+      "TIER_1_DOCTOR": "Licensed Doctor",
+      "TIER_2_NURSE": "Licensed Nurse",
+      "TIER_3_CERTIFIED_WORKER": "Certified Healthcare Worker",
+      "TIER_4_STUDENT": "Medical/Nursing Student",
+      "TIER_5_VOLUNTEER": "Community Health Volunteer"
+    },
+    "verified": "Verified",
+    "specialty": "Specialty",
+    "fee": "Consultation Fee"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous"
+  }
+}
