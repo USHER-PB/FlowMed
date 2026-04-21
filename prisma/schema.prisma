@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  PROVIDER
+  MEDICAL_CENTER
+  ADMIN
+}
+
+enum ProviderTier {
+  TIER_1_DOCTOR
+  TIER_2_NURSE
+  TIER_3_CERTIFIED_WORKER
+  TIER_4_STUDENT
+  TIER_5_VOLUNTEER
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AppointmentStatus {
+  PENDING_SUPERVISOR_APPROVAL
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum QueueStatus {
+  WAITING
+  IN_CONSULTATION
+  COMPLETED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  phone         String?  @unique
+  password      String
+  role          UserRole
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient       Patient?
+  provider      Provider?
+  medicalCenter MedicalCenter?
+  auditLogs     AuditLog[]
+}
+
+model Patient {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime?
+  gender            String?
+  address           String?
+  preferredLanguage String    @default("fr")
+
+  appointments      Appointment[]
+  diagnoses         Diagnosis[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Provider {
+  id                  String             @id @default(uuid())
+  userId              String             @unique
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier                ProviderTier
+  firstName           String
+  lastName            String
+  specialty           String?
+  licenseNumber       String?
+  verificationStatus  VerificationStatus @default(PENDING)
+  verificationDocs    String?            @db.Text
+
+  // For students (Tier 4)
+  supervisorId        String?
+  supervisor          Provider?          @relation("Supervision", fields: [supervisorId], references: [id])
+  students            Provider[]         @relation("Supervision")
+  studentYear         Int?
+
+  // Availability
+  availability        Availability[]
+
+  // Relationships
+  appointments        Appointment[]
+  diagnoses           Diagnosis[]
+  supervisedDiagnoses Diagnosis[]        @relation("SupervisorDiagnoses")
+  queueItems          QueueItem[]
+  medicalCenterId     String?
+  medicalCenter       MedicalCenter?     @relation(fields: [medicalCenterId], references: [id])
+
+  // Pricing
+  consultationFee     Decimal?           @db.Decimal(10, 2)
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([tier])
+  @@index([verificationStatus])
+  @@index([supervisorId])
+}
+
+model MedicalCenter {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name               String
+  address            String
+  phone              String
+  verificationStatus VerificationStatus @default(PENDING)
+  verificationDocs   String?            @db.Text
+
+  providers          Provider[]
+  appointments       Appointment[]
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Availability {
+  id         String   @id @default(uuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([providerId])
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerId      String
+  provider        Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  medicalCenterId String?
+  medicalCenter   MedicalCenter?    @relation(fields: [medicalCenterId], references: [id])
+
+  dateTime            DateTime
+  status              AppointmentStatus @default(CONFIRMED)
+
+  supervisorApproved  Boolean?
+  supervisorNotes     String?
+
+  queueItem           QueueItem?
+  diagnosis           Diagnosis?
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([patientId])
+  @@index([providerId])
+  @@index([dateTime])
+  @@index([status])
+}
+
+model QueueItem {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  providerId    String
+  provider      Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  position             Int
+  status               QueueStatus @default(WAITING)
+  isUrgent             Boolean     @default(false)
+  urgencyReason        String?
+  urgencyApproved      Boolean?
+
+  estimatedWaitMinutes Int?
+
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@index([providerId, position])
+  @@index([status])
+}
+
+model Diagnosis {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patientId     String
+  patient       Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerId    String
+  provider      Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  diagnosisText  String   @db.Text
+  prescriptions  String?  @db.Text
+  recommendations String? @db.Text
+  followUpDate   DateTime?
+
+  requiresSupervisorApproval Boolean  @default(false)
+  supervisorId               String?
+  supervisor                 Provider? @relation("SupervisorDiagnoses", fields: [supervisorId], references: [id])
+  supervisorApproved         Boolean?
+  supervisorFeedback         String?  @db.Text
+
+  encrypted      Boolean  @default(true)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  immutableAfter DateTime?
+
+  @@index([patientId])
+  @@index([providerId])
+  @@index([supervisorId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action     String
+  entityType String
+  entityId   String
+  metadata   String?  @db.Text
+  ipAddress  String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
