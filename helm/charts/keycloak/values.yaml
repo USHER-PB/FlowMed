@@ -1,0 +1,104 @@
+# ArgoCD projects must whitelist PriorityClass and allow ResourceQuota (see argocd/projects/)
+# Release workflows use SSH deploy key (DEPLOY_KEY secret) to bypass branch protection
+global:
+  namespace: fineract
+  imagePullSecrets: []
+  # - name: ghcr-secret
+  priorityClasses:
+    enabled: false
+
+secrets:
+  mode: generate  # "generate" for local, "existing" for cloud
+
+# PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in infra-data-storage)
+postgres:
+  host: postgres            # Service name of the PostgreSQL instance in the same namespace
+  port: 5432
+  keycloak:
+    user: keycloak
+    password: keycloak_password
+    database: keycloak
+  existingSecret: ""         # Secret containing KEYCLOAK_DB_USER and KEYCLOAK_DB_PASSWORD
+
+networkPolicies:
+  enabled: true
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.5.2"  # Upgraded from 24.0.5 for Java 21 (required by keybound plugin)
+  replicas: 1
+  port: 8080
+  admin:
+    user: admin
+    password: admin
+  mode: start  # "start-dev" for local dev only, "start" for production
+  # Public URL that determines the 'iss' claim in tokens
+  # Must match fineract.oauth.issuerUri in fineract-platform values
+  hostnameUrl: "http://auth.fineract.local"  # Empty = dynamic (hostname-strict=false). Set to e.g. "http://LB_IP:8180" for production
+  externalAppUrl: "http://fineract.local"
+  # Keybound plugin for external user storage SPI
+  keybound:
+    enabled: false  # Enable to install keybound Keycloak plugins
+    version: "0.2.5"
+    realm: fineract
+    userStorageUrl: "http://user-storage:3000/kc"
+    signatureSecret: "change-me-in-production"
+    signatureVersion: "1"
+    actor: "keycloak-u-fineract"
+    nonceCacheTtl: "60"
+    authUsername: "admin"
+    authPassword: "admin"
+  ingress:
+    enabled: true
+    blockAdminUI: false  # Set true for UAT/prod to block /admin and /realms/master
+    className: nginx
+    host: "auth.fineract.local"
+    tls:
+      enabled: false
+  resources:
+    requests:
+      memory: "384Mi"
+      cpu: "250m"
+    limits:
+      memory: "768Mi"
+      cpu: "1"
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPU: 70
+    # WARNING: Do not set targetMemory for Keycloak (JVM). JVM pre-allocates heap
+    # and memory utilization will appear permanently high, causing runaway scale-out.
+  pdb:
+    enabled: false  # Enable when replicas >= 2 (UAT/prod)
+  existingSecret: ""
+
+keycloakConfig:
+  enabled: true
+  environment: dev  # dev | uat | prod — controls realm user provisioning
+  verifyEmail: true  # Email verification enabled by default (Mailpit catches in dev)
+  # Realm security settings — override for cloud/production
+  sslRequired: "none"             # Set "EXTERNAL" for HTTPS environments
+  accessTokenLifespan: 1800       # Set 900 (15 min) for production
+  # SMTP settings — defaults to Mailpit for local dev
+  smtp:
+    host: "mailpit"
+    port: "1025"
+    from: "noreply@webank.dev"
+    fromDisplayName: "Webank"
+    replyTo: "support@webank.dev"
+    replyToDisplayName: "Webank Support"
+    ssl: "false"
+    starttls: "false"
+    auth: "false"
+  # Realm user passwords (override in production with strong values via sealed secrets)
+  # In non-dev environments, passwords are set as temporary (force change on first login)
+  realmUsers:
+    adminPassword: "admin1234"      # Keycloak realm admin
+    mifosPassword: "password"        # Fineract super admin (well-known default — MUST change in prod)
+    kycAdminPassword: "password"     # KYC Manager demo admin (dev only)
+  image:
+    repository: adorsys/keycloak-config-cli
+    tag: "6.4.1-26"
