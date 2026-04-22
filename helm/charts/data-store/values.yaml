@@ -1,0 +1,126 @@
+# =============================================================================
+# Data Store Umbrella Chart - Default Values
+# =============================================================================
+# Deploys PostgreSQL + MinIO for local development environments.
+# For production, use external RDS and S3 services.
+# =============================================================================
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  namespace: ""
+  imagePullSecrets: []
+  priorityClassName: ""
+
+# =============================================================================
+# PostgreSQL Configuration
+# =============================================================================
+postgres:
+  # Enable PostgreSQL deployment
+  enabled: true
+  
+  # Deployment mode: "standalone" or "external"
+  mode: standalone
+  
+  # Authentication
+  auth:
+    database: appdb
+    username: appuser
+    password: ""  # Auto-generated if empty
+    postgresPassword: ""  # Auto-generated if empty
+    existingSecret: ""
+  
+  # Resource allocation
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+  
+  # Network Policy
+  networkPolicy:
+    enabled: true
+    ingressNamespaces: []
+
+# =============================================================================
+# MinIO Configuration
+# =============================================================================
+minio:
+  # Enable MinIO deployment
+  enabled: true
+  
+  # Deployment mode: "standalone" or "external"
+  mode: standalone
+  
+  # Authentication
+  auth:
+    rootUser: minioadmin
+    rootPassword: ""  # Auto-generated if empty
+    existingSecret: ""
+  
+  # Buckets to create
+  buckets:
+    - name: documents
+      policy: none
+    - name: backups
+      policy: none
+  
+  # Resource allocation
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  
+  # Console
+  console:
+    enabled: true
+    ingress:
+      enabled: false
+  
+  # Network Policy
+  networkPolicy:
+    enabled: true
+    ingressNamespaces: []
+
+# =============================================================================
+# External Database Configuration (for production)
+# =============================================================================
+# Set postgres.enabled=false and configure external database:
+# postgres:
+#   enabled: false
+#   mode: external
+#   external:
+#     host: mydb.xxxxx.region.rds.amazonaws.com
+#     port: 5432
+#     database: production
+#     existingSecret: rds-credentials
+
+# =============================================================================
+# External S3 Configuration (for production)
+# =============================================================================
+# Set minio.enabled=false and configure external S3:
+# minio:
+#   enabled: false
+#   mode: external
+#   external:
+#     endpoint: s3.amazonaws.com
+#     region: us-east-1
+#     existingSecret: s3-credentials

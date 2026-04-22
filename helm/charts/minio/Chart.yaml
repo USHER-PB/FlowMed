@@ -1,0 +1,28 @@
+apiVersion: v2
+name: minio
+description: |
+  MinIO Helm chart for the OM Platform.
+  S3-compatible object storage for local development and testing.
+  Supports standalone mode for local and external mode for cloud S3 services.
+
+type: application
+version: 1.0.0
+appVersion: "RELEASE.2025-01-01"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - minio
+  - s3
+  - storage
+  - object-storage
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Storage
+  licenses: Apache-2.0

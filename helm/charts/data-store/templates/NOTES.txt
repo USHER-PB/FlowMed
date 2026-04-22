@@ -1,0 +1,135 @@
+{{/*
+=============================================================================
+Data Store Umbrella Chart - Post-Install Notes
+=============================================================================
+*/}}
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+Namespace: {{ include "data-store.namespace" . }}
+
+{{- if .Values.postgres.enabled }}
+
+================================================================================
+PostgreSQL
+================================================================================
+
+PostgreSQL is deployed in standalone mode.
+
+Connection Details:
+  Host: {{ include "data-store.postgresHost" . }}
+  Port: 5432
+  Database: {{ .Values.postgres.auth.database }}
+
+Get the credentials:
+  export PGPASSWORD=$(kubectl get secret {{ .Release.Name }}-postgres -n {{ include "data-store.namespace" . }} -o jsonpath="{.data.password}" | base64 -d)
+  export PGUSER={{ .Values.postgres.auth.username }}
+
+Connect from within the cluster:
+  kubectl run psql-client --rm -it --image=postgres:17-alpine -n {{ include "data-store.namespace" . }} -- \
+    psql -h {{ include "data-store.postgresHost" . }} -U $PGUSER -d {{ .Values.postgres.auth.database }}
+
+Port-forward for local access:
+  kubectl port-forward svc/{{ .Release.Name }}-postgres 5432:5432 -n {{ include "data-store.namespace" . }}
+
+{{- else if eq .Values.postgres.mode "external" }}
+
+================================================================================
+PostgreSQL (External)
+================================================================================
+
+PostgreSQL is configured to use an external database.
+
+Connection Details:
+  Host: {{ .Values.postgres.external.host }}
+  Port: {{ .Values.postgres.external.port }}
+  Database: {{ .Values.postgres.external.database }}
+
+Credentials are stored in secret: {{ .Values.postgres.external.existingSecret }}
+
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+
+================================================================================
+MinIO S3 Storage
+================================================================================
+
+MinIO is deployed in standalone mode.
+
+Connection Details:
+  Endpoint: {{ include "data-store.minioEndpoint" . }}
+  API Port: 9000
+  Console Port: 9001
+
+Get the credentials:
+  export MINIO_ROOT_USER=$(kubectl get secret {{ .Release.Name }}-minio -n {{ include "data-store.namespace" . }} -o jsonpath="{.data.root-user}" | base64 -d)
+  export MINIO_ROOT_PASSWORD=$(kubectl get secret {{ .Release.Name }}-minio -n {{ include "data-store.namespace" . }} -o jsonpath="{.data.root-password}" | base64 -d)
+
+{{- if .Values.minio.buckets }}
+
+Buckets created:
+{{- range $bucket := .Values.minio.buckets }}
+  - {{ $bucket.name }} (policy: {{ $bucket.policy | default "none" }})
+{{- end }}
+{{- end }}
+
+Port-forward for local access:
+  # API
+  kubectl port-forward svc/{{ .Release.Name }}-minio 9000:9000 -n {{ include "data-store.namespace" . }}
+  
+  # Console
+  kubectl port-forward svc/{{ .Release.Name }}-minio 9001:9001 -n {{ include "data-store.namespace" . }}
+
+Access Console:
+  Open http://localhost:9001 in your browser
+
+{{- else if eq .Values.minio.mode "external" }}
+
+================================================================================
+MinIO (External S3)
+================================================================================
+
+MinIO is configured to use external S3 storage.
+
+Connection Details:
+  Endpoint: {{ .Values.minio.external.endpoint }}
+  Region: {{ .Values.minio.external.region }}
+
+Credentials are stored in secret: {{ .Values.minio.external.existingSecret }}
+
+{{- end }}
+
+================================================================================
+Verification Commands
+================================================================================
+
+Check pod status:
+  kubectl get pods -n {{ include "data-store.namespace" . }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Check PVC status:
+  kubectl get pvc -n {{ include "data-store.namespace" . }}
+
+View logs:
+{{- if .Values.postgres.enabled }}
+  kubectl logs -n {{ include "data-store.namespace" . }} -l app.kubernetes.io/name=postgres
+{{- end }}
+{{- if .Values.minio.enabled }}
+  kubectl logs -n {{ include "data-store.namespace" . }} -l app.kubernetes.io/name=minio
+{{- end }}
+
+================================================================================
+Next Steps
+================================================================================
+
+1. Verify PostgreSQL connectivity:
+   kubectl run pg-test --rm -it --image=postgres:17-alpine -n {{ include "data-store.namespace" . }} -- \
+     psql "postgresql://{{ .Values.postgres.auth.username }}:$PGPASSWORD@{{ include "data-store.postgresHost" . }}:5432/{{ .Values.postgres.auth.database }}"
+
+2. Verify MinIO connectivity:
+   kubectl run mc-test --rm -it --image=minio/mc:RELEASE.2025-01-01T00-00-00Z -n {{ include "data-store.namespace" . }} -- \
+     mc alias set myminio {{ include "data-store.minioEndpoint" . }} $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && mc ls myminio
+
+3. Configure your applications to use these services
+
+For more information, see the chart README files.

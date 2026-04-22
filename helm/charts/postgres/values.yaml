@@ -1,0 +1,320 @@
+# =============================================================================
+# PostgreSQL Helm Chart - Default Values
+# =============================================================================
+# Supports standalone mode for local development and external mode for cloud.
+# For production HA, use bitnami/postgresql-ha or CloudNativePG directly.
+# =============================================================================
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  # Override namespace (defaults to release namespace)
+  namespace: ""
+  # Image pull secrets for private registries
+  imagePullSecrets: []
+  # Priority class name for pods
+  priorityClassName: ""
+
+# =============================================================================
+# PostgreSQL Deployment Control
+# =============================================================================
+# Enable PostgreSQL deployment (set to false for external databases)
+enabled: true
+
+# Deployment mode:
+# - "standalone": Single PostgreSQL instance (local/dev)
+# - "ha": High Availability mode (Production)
+# - "external": Use external database (RDS, Cloud SQL, etc.)
+mode: standalone
+
+# Number of replicas (used when mode is standalone or ha)
+replicaCount: 1
+
+# =============================================================================
+# External Database Configuration (when mode: external)
+# =============================================================================
+external:
+  # Database host (e.g., mydb.xxxxx.region.rds.amazonaws.com)
+  host: ""
+  # Database port
+  port: 5432
+  # Database name
+  database: ""
+  # Existing secret containing credentials
+  existingSecret: ""
+  # Keys within the secret
+  secretKeys:
+    username: username
+    password: password
+    # For connection strings
+    connectionString: ""
+
+# =============================================================================
+# Internal PostgreSQL Configuration (when mode: standalone)
+# =============================================================================
+image:
+  repository: postgres
+  tag: "17-alpine"
+  pullPolicy: IfNotPresent
+
+# =============================================================================
+# Authentication
+# =============================================================================
+# IMPORTANT: For production, use existingSecret with External Secrets Operator
+# or Sealed Secrets. Never commit real passwords to git.
+auth:
+  # Database name to create
+  database: appdb
+  # Username for application access
+  username: appuser
+  # Password (leave empty for auto-generation)
+  # WARNING: Auto-generated passwords are not suitable for production
+  password: ""
+  # PostgreSQL superuser password (leave empty for auto-generation)
+  postgresPassword: ""
+  # Replication user password (for future HA support)
+  replicationPassword: ""
+  # Use existing secret for credentials
+  existingSecret: ""
+  # Keys within the existing secret
+  secretKeys:
+    username: username
+    password: password
+    postgresPassword: postgres-password
+    replicationPassword: replication-password
+
+# =============================================================================
+# Additional Databases
+# =============================================================================
+# Create additional databases and users
+additionalDatabases: []
+  # - name: keycloak
+  #   user: keycloak
+  #   password: ""  # Leave empty to auto-generate
+  # - name: tenants
+  #   user: tenant_admin
+  #   password: ""
+
+# =============================================================================
+# Resource Allocation
+# =============================================================================
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+# =============================================================================
+# Persistence
+# =============================================================================
+persistence:
+  enabled: true
+  # Storage class (empty for default)
+  storageClass: ""
+  # Access modes
+  accessModes:
+    - ReadWriteOnce
+  # Storage size
+  size: 5Gi
+  # Existing PVC to use (disables dynamic provisioning)
+  existingClaim: ""
+  # Annotations for PVC
+  annotations: {}
+  # Labels for PVC
+  labels: {}
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  # Service type
+  type: ClusterIP
+  # Service port
+  port: 5432
+  # Annotations for service
+  annotations: {}
+  # Labels for service
+  labels: {}
+
+# =============================================================================
+# Primary Instance Configuration
+# =============================================================================
+primary:
+  # Pod affinity settings
+  affinity: {}
+  # Node selector
+  nodeSelector: {}
+  # Tolerations
+  tolerations: []
+  # Pod annotations
+  podAnnotations: {}
+  # Pod labels
+  podLabels: {}
+  # Security context for pod
+  podSecurityContext:
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # Priority class name (overrides global)
+  priorityClassName: ""
+  # Termination grace period
+  terminationGracePeriodSeconds: 30
+
+# =============================================================================
+# Health Checks
+# =============================================================================
+livenessProbe:
+  enabled: true
+  exec:
+    command:
+      - sh
+      - -c
+      - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  exec:
+    command:
+      - sh
+      - -c
+      - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  enabled: true
+  exec:
+    command:
+      - sh
+      - -c
+      - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# =============================================================================
+# Network Policy
+# =============================================================================
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to connect
+  ingressNamespaces: []
+  # Specific pods allowed to connect (label selector)
+  ingressPods: []
+  # Egress rules
+  egress: []
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+monitoring:
+  # Enable Prometheus monitoring (adds pod annotations)
+  enabled: false
+  # Prometheus exporter port (for pod annotation)
+  # Note: Requires postgres_exporter sidecar (not included by default)
+  prometheusPort: 9187
+  serviceMonitor:
+    # Enable ServiceMonitor resource
+    enabled: false
+    # Labels for ServiceMonitor
+    labels: {}
+    # Annotations for ServiceMonitor
+    annotations: {}
+    # Interval for scraping
+    interval: 30s
+    # Scrape timeout
+    scrapeTimeout: 10s
+    # Namespace for ServiceMonitor (defaults to release namespace)
+    namespace: ""
+
+# =============================================================================
+# Backup Configuration
+# =============================================================================
+backup:
+  enabled: false
+  # Backup schedule (cron format)
+  schedule: "0 2 * * *"
+  # Backup retention (number of backups to keep)
+  retention: 7
+  # Backup storage size
+  storage: 10Gi
+  # S3/MinIO backup configuration
+  s3:
+    enabled: false
+    endpoint: ""
+    bucket: ""
+    existingSecret: ""
+    secretKeys:
+      accessKey: access-key
+      secretKey: secret-key
+
+# =============================================================================
+# Init Scripts
+# =============================================================================
+# Custom init scripts to run on first start
+initScripts: {}
+  # 01-init.sql: |
+  #   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+# ConfigMap with init scripts
+initScriptsConfigMap: ""
+
+# =============================================================================
+# PostgreSQL Configuration
+# =============================================================================
+# PostgreSQL configuration parameters
+config: {}
+  # max_connections: "200"
+  # shared_buffers: "128MB"
+  # work_mem: "4MB"
+
+# PostgreSQL host-based authentication rules
+pgHbaConfiguration: ""
+  # local all all trust
+  # host all all 127.0.0.1/32 md5
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  # Create service account
+  create: true
+  # Service account name (defaults to release name)
+  name: ""
+  # Annotations for service account
+  annotations: {}
+  # Labels for service account
+  labels: {}
+
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+pdb:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+commonLabels: {}
+commonAnnotations: {}

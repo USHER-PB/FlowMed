@@ -1,0 +1,326 @@
+# =============================================================================
+# MinIO Helm Chart - Default Values
+# =============================================================================
+# S3-compatible object storage for local development and testing.
+# Supports standalone mode for local and external mode for cloud S3 services.
+# =============================================================================
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  # Override namespace (defaults to release namespace)
+  namespace: ""
+  # Image pull secrets for private registries
+  imagePullSecrets: []
+  # Priority class name for pods
+  priorityClassName: ""
+
+# =============================================================================
+# MinIO Deployment Control
+# =============================================================================
+# Enable MinIO deployment (set to false for external S3)
+enabled: true
+
+# Deployment mode:
+# - "standalone": Single MinIO instance (local/dev)
+# - "distributed": Distributed High Availability mode (Production)
+# - "external": Use external S3 service (AWS S3, etc.)
+mode: standalone
+
+# Number of replicas (used when mode is standalone or distributed)
+# For distributed mode, this should be at least 4.
+replicaCount: 1
+
+# =============================================================================
+# External S3 Configuration (when mode: external)
+# =============================================================================
+external:
+  # S3 endpoint (e.g., s3.amazonaws.com)
+  endpoint: ""
+  # Region
+  region: ""
+  # Use SSL
+  ssl: true
+  # Existing secret containing credentials
+  existingSecret: ""
+  # Keys within the secret
+  secretKeys:
+    accessKey: access-key-id
+    secretKey: secret-access-key
+  # Default bucket to use
+  defaultBucket: ""
+
+# =============================================================================
+# Internal MinIO Configuration (when mode: standalone)
+# =============================================================================
+image:
+  repository: minio/minio
+  tag: "RELEASE.2025-01-01T00-00-00Z"
+  pullPolicy: IfNotPresent
+
+# mc image for bucket initialization
+mcImage:
+  repository: minio/mc
+  tag: "RELEASE.2025-01-01T00-00-00Z"
+  pullPolicy: IfNotPresent
+
+# Init container image for permissions fix
+initContainer:
+  image:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 16Mi
+      cpu: 10m
+    limits:
+      memory: 32Mi
+      cpu: 50m
+
+# =============================================================================
+# Authentication
+# =============================================================================
+# IMPORTANT: For production, use existingSecret with External Secrets Operator
+# or Sealed Secrets. Never commit real passwords to git.
+auth:
+  # Root user (admin)
+  rootUser: minioadmin
+  # Root password (leave empty for auto-generation)
+  # WARNING: Auto-generated passwords are not suitable for production
+  rootPassword: ""
+  # Use existing secret for credentials
+  existingSecret: ""
+  # Keys within the existing secret
+  secretKeys:
+    rootUser: root-user
+    rootPassword: root-password
+
+# =============================================================================
+# Buckets
+# =============================================================================
+# Buckets to create on startup
+buckets: []
+  # - name: documents
+  #   policy: none  # none, download, upload, public
+  #   quota: ""     # e.g., "10GB"
+  #   lifecycle: {} # Lifecycle configuration
+  # - name: backups
+  #   policy: none
+  # - name: uploads
+  #   policy: public
+
+# =============================================================================
+# Resource Allocation
+# =============================================================================
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 250m
+
+# =============================================================================
+# Persistence
+# =============================================================================
+persistence:
+  enabled: true
+  # Storage class (empty for default)
+  storageClass: ""
+  # Access modes
+  accessModes:
+    - ReadWriteOnce
+  # Storage size
+  size: 10Gi
+  # Existing PVC to use (disables dynamic provisioning)
+  existingClaim: ""
+  # Annotations for PVC
+  annotations: {}
+  # Labels for PVC
+  labels: {}
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  # Service type
+  type: ClusterIP
+  # API port
+  apiPort: 9000
+  # Console port
+  consolePort: 9001
+  # Annotations for service
+  annotations: {}
+  # Labels for service
+  labels: {}
+
+# =============================================================================
+# Console Configuration
+# =============================================================================
+console:
+  # Enable MinIO Console
+  enabled: true
+  # Console ingress configuration
+  ingress:
+    enabled: false
+    # Ingress class name
+    className: ""
+    # Hostname
+    host: ""
+    # Path
+    path: /
+    pathType: Prefix
+    # TLS configuration
+    tls:
+      enabled: false
+      secretName: ""
+    # Annotations
+    annotations: {}
+
+# =============================================================================
+# Pod Configuration
+# =============================================================================
+pod:
+  # Pod affinity settings
+  affinity: {}
+  # Node selector
+  nodeSelector: {}
+  # Tolerations
+  tolerations: []
+  # Pod annotations
+  annotations: {}
+  # Pod labels
+  labels: {}
+  # Security context for pod
+  securityContext:
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # Priority class name (overrides global)
+  priorityClassName: ""
+  # Termination grace period
+  terminationGracePeriodSeconds: 30
+
+# =============================================================================
+# Health Checks
+# =============================================================================
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /minio/health/live
+    port: api
+  initialDelaySeconds: 15
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /minio/health/ready
+    port: api
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /minio/health/live
+    port: api
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 12
+
+# =============================================================================
+# Network Policy
+# =============================================================================
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to connect
+  ingressNamespaces: []
+  # Specific pods allowed to connect (label selector)
+  ingressPods: []
+  # Egress rules
+  egress: []
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+monitoring:
+  # Enable Prometheus monitoring (adds pod annotations)
+  enabled: false
+  # Prometheus scrape port (for pod annotation)
+  prometheusPort: 9000
+  serviceMonitor:
+    # Enable ServiceMonitor resource
+    enabled: false
+    # Labels for ServiceMonitor
+    labels: {}
+    # Annotations for ServiceMonitor
+    annotations: {}
+    # Interval for scraping
+    interval: 30s
+    # Scrape timeout
+    scrapeTimeout: 10s
+    # Namespace for ServiceMonitor (defaults to release namespace)
+    namespace: ""
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  # Create service account
+  create: true
+  # Service account name (defaults to release name)
+  name: ""
+  # Annotations for service account
+  annotations: {}
+  # Labels for service account
+  labels: {}
+
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+pdb:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# =============================================================================
+# Bucket Init Job
+# =============================================================================
+bucketInit:
+  # Enable bucket initialization job
+  enabled: true
+  # Job resources
+  resources:
+    requests:
+      memory: 32Mi
+      cpu: 10m
+    limits:
+      memory: 64Mi
+      cpu: 50m
+  # Backoff limit
+  backoffLimit: 5
+  # Active deadline seconds
+  activeDeadlineSeconds: 300
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+commonLabels: {}
+commonAnnotations: {}

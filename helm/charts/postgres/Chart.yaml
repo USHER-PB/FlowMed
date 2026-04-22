@@ -1,0 +1,28 @@
+apiVersion: v2
+name: postgres
+description: |
+  PostgreSQL Helm chart for the OM Platform.
+  Supports standalone mode for local development and external mode for cloud databases (RDS, Cloud SQL).
+  Production HA deployments should use bitnami/postgresql-ha or CloudNativePG directly.
+
+type: application
+version: 1.0.0
+appVersion: "17.2"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - postgresql
+  - database
+  - sql
+  - storage
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Database
+  licenses: Apache-2.0
