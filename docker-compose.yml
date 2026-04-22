@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   app:
     build:
@@ -8,21 +6,19 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=mysql://healthuser:healthpass@db:3306/healthapp
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-jwt-secret-change-in-production
-      - ENCRYPTION_KEY=dev-encryption-key-32-chars-long!!
+      - JWT_SECRET=nlM32kTpujzoF4QIV6Dzpgj2DXQ0QKE0DvyO7aSDttOwrXmj8egJYad0xuo2ZcGRPubXVaARrvoe+Xpj75sNTA==
+      - JWT_EXPIRES_IN=7d
+      - ENCRYPTION_KEY=+MpkGVbEH1M6oHgIVnIndNQ7Fr0x/BDEUASiH9quao8=
       - NEXTAUTH_URL=http://localhost:3000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
     restart: unless-stopped
 
   db:
