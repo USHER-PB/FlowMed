@@ -38,8 +38,8 @@ keycloak:
   mode: start  # "start-dev" for local dev only, "start" for production (KC_BOOTSTRAP_* env vars create admin user)
   # Public URL that determines the 'iss' claim in tokens
   # Must match fineract.oauth.issuerUri in fineract-platform values
-  # NOTE: For Keycloak 18, use just the hostname without http:// prefix
-  hostnameUrl: "auth.fineract.local"  # Just hostname, no protocol prefix
+  # NOTE: Must include protocol (http:// or https://) for Keycloak 26+ frontendUrl
+  hostnameUrl: "http://auth.fineract.local"  # Full URL with protocol for realm frontendUrl
   externalAppUrl: "http://fineract.local"
   # Keybound plugin for external user storage SPI
   keybound:
