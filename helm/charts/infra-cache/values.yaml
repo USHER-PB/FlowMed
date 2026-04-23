@@ -17,15 +17,10 @@ redis:
 
   auth:
     enabled: true
-    # Global password for dev/local use. Helm generates the secret using this.
-    password: "redis_dev_password"
-    
-    # --------------------------------------------------------------------------
-    # PRODUCTION SECURITY (SealedSecrets):
-    # Uncomment these lines in production to use a pre-created SealedSecret
-    # --------------------------------------------------------------------------
-    # existingSecret: "infra-cache-redis-auth"
-    # existingSecretPasswordKey: "redis-password"
+    # Using SealedSecret for secure secret management
+    # The secret 'infra-cache-redis-auth' is created via SealedSecret in configs/sealed-secrets/
+    existingSecret: "infra-cache-redis-auth"
+    existingSecretPasswordKey: "redis-password"
 
   master:
     persistence:
@@ -71,11 +66,13 @@ prometheus-redis-exporter:
   # The service name defaults to `<release-name>-redis-master`.
   redisAddress: "redis://infra-cache-redis-master:6379"
 
-  # Pass the authentication password to the exporter. 
-  # Note: If you use SealedSecrets above, you should also pass the secret here using `envFromSecret`.
+  # Pass the authentication password to the exporter using the SealedSecret
   env:
     - name: REDIS_PASSWORD
-      value: "redis_dev_password"
+      valueFrom:
+        secretKeyRef:
+          name: infra-cache-redis-auth
+          key: redis-password
 
   serviceMonitor:
     enabled: true
