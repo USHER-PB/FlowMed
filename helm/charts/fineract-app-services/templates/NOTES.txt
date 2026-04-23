@@ -1,0 +1,35 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your Fineract Application Services deployment is now running.
+
+Deployed Services:
+{{- if .Values.paymentGateway.enabled }}
+  - Payment Gateway (port {{ .Values.paymentGateway.service.port | default 8082 }})
+{{- end }}
+{{- if .Values.assetService.enabled }}
+  - Asset Service (port {{ .Values.assetService.service.port | default 8083 }})
+{{- end }}
+{{- if .Values.customerSelfService.enabled }}
+  - Customer Self-Service (port {{ .Values.customerSelfService.service.port | default 8080 }})
+{{- end }}
+{{- if .Values.smsGateway.enabled }}
+  - SMS Gateway (port {{ .Values.smsGateway.service.port | default 8080 }})
+{{- end }}
+
+Global Configuration:
+  - Keycloak URL: {{ .Values.global.keycloakUrl }}
+  - Fineract URL: {{ .Values.global.fineractUrl }}
+  - Storage Endpoint: {{ .Values.global.storage.endpoint }}
+
+To verify the deployment:
+
+  # Check all pods are running
+  kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  # Check services
+  kubectl get services -l app.kubernetes.io/instance={{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  # View logs for a specific service
+  kubectl logs -l app.kubernetes.io/component=payment-gateway -n {{ .Release.Namespace }} -f
+
+For more information, see the README.md file.

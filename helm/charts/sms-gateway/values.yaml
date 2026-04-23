@@ -1,0 +1,222 @@
+# Default values for sms-gateway.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Number of replicas (overridden by HPA if enabled)
+replicaCount: 1
+
+# Image configuration
+image:
+  registry: ghcr.io
+  repository: adorsys-gis/fineract-apps/sms-gateway
+  tag: "latest"
+  pullPolicy: Always
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+# - name: regcred
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  runAsUser: 65532
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%
+
+# Resource limits and requests
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+
+# Liveness probe configuration
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Startup probe configuration
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: ~
+  behavior: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ~
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  ingressNamespace: "ingress-nginx"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Annotations for deployment
+annotations: {}
+
+# Init containers configuration
+initContainers:
+  waitForDependencies:
+    enabled: true
+    image: busybox:1.36
+    maxAttempts: 24
+    securityContext:
+      runAsUser: 65534
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+    resources:
+      requests:
+        memory: "16Mi"
+        cpu: "10m"
+      limits:
+        memory: "32Mi"
+        cpu: "50m"
+
+# Configuration settings
+config:
+  # Log level (Rust)
+  logLevel: "info"
+
+  # Database configuration
+  database:
+    host: "postgres"
+    port: 5432
+    name: "user_storage"
+    username: "user_storage"
+    password: ""  # Set via sealed-secret
+    poolSize: 5
+
+  # Redis configuration
+  redis:
+    enabled: false
+    host: "redis"
+    port: 6379
+    password: ""  # Set via sealed-secret
+    existingSecret: ""
+
+  # Storage (MinIO)
+  storage:
+    endpoint: "http://minio:9000"
+    region: "default"
+    bucket: "sms-storage"
+    accessKey: ""  # Set via sealed-secret
+    secretKey: ""  # Set via sealed-secret
+
+  # OAuth2 configuration
+  oauth2:
+    issuer: "http://keycloak:8080/realms/master"
+
+  # CUSS API
+  cuss:
+    apiUrl: ""
+
+  # SMS configuration
+  sms:
+    provider: "avlytext"  # or "orange"
+
+# SMS Providers configuration
+providers:
+  # AvlyText SMS Provider
+  avlytext:
+    enabled: true
+    baseUrl: "https://api.avlytext.com"
+    apiKey: ""  # Set via sealed-secret
+    senderId: "FINERACT"
+
+  # Orange SMS Provider
+  orange:
+    enabled: false
+    clientId: ""
+    clientSecret: ""  # Set via sealed-secret
+    tokenUrl: "https://api.orange.com/oauth/v3/token"
+    smsBaseUrl: "https://api.orange.com/smsmessaging/v4"
+    contractUrl: ""
+    defaultSender: "FINERACT"
+
+# Extra environment variables
+extraEnv: []
+
+# Existing secret for credentials (if using sealed-secrets)
+existingSecret: ""

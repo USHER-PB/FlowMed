@@ -1,0 +1,29 @@
+apiVersion: v2
+name: asset-service
+description: |
+  Asset Service for Fineract platform.
+  Manages digital assets, GL accounts, tax calculations, and market operations.
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - asset
+  - investment
+  - gl-accounts
+  - tax
+  - fineract
+  - digital-assets
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Application
+  wave: "5"

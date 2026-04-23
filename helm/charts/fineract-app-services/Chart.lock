@@ -1,0 +1,15 @@
+dependencies:
+- name: payment-gateway
+  repository: file://../payment-gateway
+  version: 1.0.0
+- name: asset-service
+  repository: file://../asset-service
+  version: 1.0.0
+- name: customer-self-service
+  repository: file://../customer-self-service
+  version: 1.0.0
+- name: sms-gateway
+  repository: file://../sms-gateway
+  version: 1.0.0
+digest: sha256:6cb4e08b37f813fbd6c3eec44d077d0f11ad9409dad45716545c30982317affb
+generated: "2026-04-23T11:23:18.846485493+01:00"

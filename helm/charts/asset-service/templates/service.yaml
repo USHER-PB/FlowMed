@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "asset-service.fullname" . }}
+  labels:
+    {{- include "asset-service.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+    {{- if .Values.management.port }}
+    - port: {{ .Values.management.port }}
+      targetPort: {{ .Values.management.port }}
+      protocol: TCP
+      name: management
+    {{- end }}
+  selector:
+    {{- include "asset-service.selectorLabels" . | nindent 4 }}

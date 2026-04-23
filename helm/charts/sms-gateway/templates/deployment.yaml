@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sms-gateway.fullname" . }}
+  labels:
+    {{- include "sms-gateway.labels" . | nindent 4 }}
+  {{- with (include "sms-gateway.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sms-gateway.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "sms-gateway.podAnnotations" . | nindent 8 }}
+        # Force rollout on config change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "sms-gateway.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sms-gateway.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers.waitForDependencies.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              ATTEMPT=0; MAX={{ .Values.initContainers.waitForDependencies.maxAttempts }}
+              until nc -z {{ .Values.config.database.host }} {{ .Values.config.database.port }} 2>/dev/null; do
+                ATTEMPT=$((ATTEMPT+1))
+                if [ $ATTEMPT -ge $MAX ]; then echo "ERROR: postgres not ready after $((MAX*5))s"; exit 1; fi
+                echo "waiting for postgres ($ATTEMPT/$MAX)..."; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: {{ include "sms-gateway.name" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "sms-gateway.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "--config"
+            - "/app/config/config.yaml"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            # Database URL with password from secret
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-gateway.secretName" . }}
+                  key: db-password
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.config.database.username }}:$(DB_PASSWORD)@{{ .Values.config.database.host }}:{{ .Values.config.database.port }}/{{ .Values.config.database.name }}"
+            # Redis URL with password from secret
+            {{- if .Values.config.redis.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.redis.existingSecret | default (include "sms-gateway.secretName" .) }}
+                  key: redis-password
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.config.redis.host }}:{{ .Values.config.redis.port }}"
+            {{- end }}
+            # MinIO configuration
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.config.storage.endpoint | quote }}
+            - name: MINIO_REGION
+              value: {{ .Values.config.storage.region | quote }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-gateway.secretName" . }}
+                  key: storage-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-gateway.secretName" . }}
+                  key: storage-secret-key
+            - name: MINIO_BUCKET
+              value: {{ .Values.config.storage.bucket | quote }}
+            # SMS Provider credentials
+            {{- if .Values.providers.avlytext.enabled }}
+            - name: AVLYTEXT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-gateway.secretName" . }}
+                  key: avlytext-api-key
+            {{- end }}
+            {{- if .Values.providers.orange.enabled }}
+            - name: ORANGE_SMS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sms-gateway.secretName" . }}
+                  key: orange-sms-client-secret
+            {{- end }}
+            # Logging
+            - name: RUST_LOG
+              value: {{ .Values.config.logLevel | default "info" | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "sms-gateway.fullname" . }}-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

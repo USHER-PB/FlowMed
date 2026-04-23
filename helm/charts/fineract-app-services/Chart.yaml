@@ -1,0 +1,54 @@
+apiVersion: v2
+name: fineract-app-services
+description: |
+  Umbrella chart for Fineract application services including Payment Gateway,
+  Asset Service, Customer Self-Service, and SMS Gateway.
+
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - fineract
+  - banking
+  - microfinance
+  - payment-gateway
+  - asset-service
+  - customer-self-service
+  - sms-gateway
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Application
+
+dependencies:
+  - name: payment-gateway
+    version: "1.0.0"
+    repository: "file://../payment-gateway"
+    condition: payment-gateway.enabled
+    alias: paymentGateway
+
+  - name: asset-service
+    version: "1.0.0"
+    repository: "file://../asset-service"
+    condition: asset-service.enabled
+    alias: assetService
+
+  - name: customer-self-service
+    version: "1.0.0"
+    repository: "file://../customer-self-service"
+    condition: customer-self-service.enabled
+    alias: customerSelfService
+
+  - name: sms-gateway
+    version: "1.0.0"
+    repository: "file://../sms-gateway"
+    condition: sms-gateway.enabled
+    alias: smsGateway
