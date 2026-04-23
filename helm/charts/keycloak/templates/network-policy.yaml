@@ -27,6 +27,7 @@ spec:
         {{- end }}
 ---
 # Allow Keycloak (8080 + 9000) from all pods in namespace + ingress controller
+# Also allow Egress for DNS and PostgreSQL
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -40,6 +41,7 @@ spec:
       app.kubernetes.io/component: keycloak
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     - from:
         - podSelector: {}
@@ -57,4 +59,26 @@ spec:
           port: {{ .Values.keycloak.port }}
         - protocol: TCP
           port: 9000
+  egress:
+    # Allow DNS resolution (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow PostgreSQL connection to data-store namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.postgres.namespace | default "data-store" }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.postgres.port | default 5432 }}
 {{- end }}

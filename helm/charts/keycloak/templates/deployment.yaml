@@ -104,8 +104,10 @@ spec:
           args:
             - {{ .Values.keycloak.mode }}
             - --http-enabled=true
+            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
             - --health-enabled=true
             - --metrics-enabled=true
+            {{- end }}
             {{- if .Values.keycloak.hostnameUrl }}
             - --hostname={{ .Values.keycloak.hostnameUrl }}
             {{- else }}
@@ -117,6 +119,8 @@ spec:
             - containerPort: 9000
               name: management
           env:
+            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+            # Keycloak 22+ uses KC_* environment variables
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL_HOST
@@ -145,6 +149,37 @@ spec:
                 secretKeyRef:
                   name: {{ include "keycloak.keycloak.secretName" . }}
                   key: KEYCLOAK_ADMIN_PASSWORD
+            {{- else }}
+            # Keycloak <22 uses legacy environment variables
+            - name: DB_VENDOR
+              value: postgres
+            - name: DB_ADDR
+              value: {{ .Values.postgres.host }}
+            - name: DB_PORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.postgres.keycloak.database }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_PASSWORD
+            - name: KEYCLOAK_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            {{- end }}
             - name: JAVA_OPTS_APPEND
               value: "-XX:MaxRAMPercentage=50.0 -XX:+UseStringDeduplication"
             {{- if .Values.keycloak.keybound.enabled }}
@@ -165,6 +200,7 @@ spec:
             - name: NONCE_CACHE_TTL_{{ .Values.keycloak.keybound.realm }}
               value: {{ .Values.keycloak.keybound.nonceCacheTtl | quote }}
             {{- end }}
+          {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
           startupProbe:
             httpGet:
               path: /health/ready
@@ -185,6 +221,29 @@ spec:
             initialDelaySeconds: 120
             periodSeconds: 15
             timeoutSeconds: 5
+          {{- else }}
+          # Keycloak <22 uses HTTP port for health checks
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+          {{- end }}
           {{- if .Values.keycloak.keybound.enabled }}
           volumeMounts:
             - name: keycloak-providers
