@@ -102,16 +102,26 @@ spec:
             capabilities:
               drop: ["ALL"]
           args:
+            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+            # Keycloak 22+ uses start mode with health/metrics
             - {{ .Values.keycloak.mode }}
             - --http-enabled=true
-            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
             - --health-enabled=true
             - --metrics-enabled=true
-            {{- end }}
             {{- if .Values.keycloak.hostnameUrl }}
             - --hostname={{ .Values.keycloak.hostnameUrl }}
             {{- else }}
             - --hostname-strict=false
+            {{- end }}
+            {{- else }}
+            # Keycloak <22 uses start-dev mode which auto-creates admin from KEYCLOAK_ADMIN env vars
+            - start-dev
+            - --http-enabled=true
+            {{- if .Values.keycloak.hostnameUrl }}
+            - --hostname={{ .Values.keycloak.hostnameUrl }}
+            {{- else }}
+            - --hostname-strict=false
+            {{- end }}
             {{- end }}
           ports:
             - containerPort: {{ .Values.keycloak.port }}
@@ -169,12 +179,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "keycloak.postgres.secretName" . }}
                   key: KEYCLOAK_DB_PASSWORD
-            - name: KEYCLOAK_USER
+            - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "keycloak.keycloak.secretName" . }}
                   key: KEYCLOAK_ADMIN
-            - name: KEYCLOAK_PASSWORD
+            - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "keycloak.keycloak.secretName" . }}
@@ -186,15 +196,24 @@ spec:
             - name: BACKEND_HTTP_BASE_PATH_{{ .Values.keycloak.keybound.realm }}
               value: {{ .Values.keycloak.keybound.userStorageUrl | quote }}
             - name: BACKEND_HTTP_SIGNATURE_SECRET_{{ .Values.keycloak.keybound.realm }}
-              value: {{ .Values.keycloak.keybound.signatureSecret | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_SIGNATURE_SECRET
             - name: BACKEND_HTTP_SIGNATURE_VERSION_{{ .Values.keycloak.keybound.realm }}
               value: {{ .Values.keycloak.keybound.signatureVersion | quote }}
             - name: BACKEND_HTTP_ACTOR_{{ .Values.keycloak.keybound.realm }}
               value: {{ .Values.keycloak.keybound.actor | quote }}
             - name: BACKEND_HTTP_AUTH_USERNAME
-              value: {{ .Values.keycloak.keybound.authUsername | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_AUTH_USERNAME
             - name: BACKEND_HTTP_AUTH_PASSWORD
-              value: {{ .Values.keycloak.keybound.authPassword | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_AUTH_PASSWORD
             - name: BACKEND_HTTP_TELEMETRY_ENABLED_{{ .Values.keycloak.keybound.realm }}
               value: "true"
             - name: NONCE_CACHE_TTL_{{ .Values.keycloak.keybound.realm }}

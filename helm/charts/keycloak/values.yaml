@@ -8,11 +8,13 @@ global:
     enabled: false
 
 secrets:
-  mode: existing  # "generate" for local, "existing" for cloud/SealedSecrets
+  mode: generate  # "generate" for infra-first deployment, "existing" when service secrets exist
 
-# PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in infra-data-storage)
+# PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in fineract namespace)
 postgres:
-  host: data-store-postgres.data-store.svc.cluster.local  # PostgreSQL service in data-store namespace
+  namespace: fineract  # PostgreSQL namespace for NetworkPolicy egress
+  # CloudNativePG creates -rw, -ro, -r services. Use -rw for read-write access
+  host: data-store-postgres-rw.fineract.svc.cluster.local  # PostgreSQL RW service in fineract namespace
   port: 5432
   keycloak:
     user: keycloak
@@ -27,29 +29,28 @@ keycloak:
   enabled: true
   image:
     repository: quay.io/keycloak/keycloak
-    tag: "18.0.0"  # Older version with older glibc for CPU compatibility
+    tag: "26.5.2"  # Keycloak 26.5.2 - latest stable with Java 21 support for keybound plugin
   replicas: 1
   port: 8080
   admin:
     user: admin
     password: admin
-  mode: start  # "start-dev" for local dev only, "start" for production
+  mode: start  # "start-dev" for local dev only, "start" for production (KC_BOOTSTRAP_* env vars create admin user)
   # Public URL that determines the 'iss' claim in tokens
   # Must match fineract.oauth.issuerUri in fineract-platform values
-  hostnameUrl: "http://auth.fineract.local"  # Empty = dynamic (hostname-strict=false). Set to e.g. "http://LB_IP:8180" for production
+  # NOTE: For Keycloak 18, use just the hostname without http:// prefix
+  hostnameUrl: "auth.fineract.local"  # Just hostname, no protocol prefix
   externalAppUrl: "http://fineract.local"
   # Keybound plugin for external user storage SPI
   keybound:
-    enabled: false  # Enable to install keybound Keycloak plugins
+    enabled: true  # Enable to install keybound Keycloak plugins
     version: "0.2.5"
     realm: fineract
     userStorageUrl: "http://user-storage:3000/kc"
-    signatureSecret: "change-me-in-production"
+    existingSecret: "keycloak-keybound"  # SealedSecret containing KEYBOUND_SIGNATURE_SECRET, KEYBOUND_AUTH_USERNAME, KEYBOUND_AUTH_PASSWORD
     signatureVersion: "1"
     actor: "keycloak-u-fineract"
     nonceCacheTtl: "60"
-    authUsername: "admin"
-    authPassword: "admin"
   ingress:
     enabled: true
     blockAdminUI: false  # Set true for UAT/prod to block /admin and /realms/master
@@ -101,4 +102,4 @@ keycloakConfig:
     kycAdminPassword: "password"     # KYC Manager demo admin (dev only)
   image:
     repository: adorsys/keycloak-config-cli
-    tag: "6.4.1-26"
+    tag: "6.5.0-26.5.4"  # Must match Keycloak version (6.5.0 for Keycloak 26.5.x)
