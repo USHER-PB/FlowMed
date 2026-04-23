@@ -1,0 +1,42 @@
+Azamra Edge Services has been deployed!
+
+Components:
+{{- if .Values.azamraBff.enabled }}
+  - Azamra BFF (Backend for Frontend)
+    Port: {{ .Values.azamraBff.port }}
+{{- end }}
+{{- if .Values.azamraKycManager.enabled }}
+  - KYC Manager
+    Port: {{ .Values.azamraKycManager.port }}
+{{- end }}
+{{- if .Values.userStorage.enabled }}
+  - User Storage (SPI)
+    Port: {{ .Values.userStorage.port }}
+{{- end }}
+
+{{- if or .Values.azamraBff.ingress.enabled .Values.azamraKycManager.ingress.enabled }}
+
+Access URLs:
+{{- if .Values.azamraBff.ingress.enabled }}
+  - BFF: https://{{ .Values.azamraBff.ingress.host }}
+{{- end }}
+{{- if .Values.azamraKycManager.ingress.enabled }}
+  - KYC Manager: https://{{ .Values.azamraKycManager.ingress.host }}
+{{- end }}
+{{- else }}
+
+Port-forward to access services locally:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/azamra-bff {{ .Values.azamraBff.port }}:{{ .Values.azamraBff.port }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/azamra-kyc-manager {{ .Values.azamraKycManager.port }}:{{ .Values.azamraKycManager.port }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/user-storage {{ .Values.userStorage.port }}:{{ .Values.userStorage.port }}
+{{- end }}
+
+Health checks:
+  kubectl exec -n {{ .Release.Namespace }} deploy/azamra-bff -- curl -s http://localhost:{{ .Values.azamraBff.port }}/actuator/health
+  kubectl exec -n {{ .Release.Namespace }} deploy/azamra-kyc-manager -- curl -s http://localhost:{{ .Values.azamraKycManager.port }}/
+  kubectl exec -n {{ .Release.Namespace }} deploy/user-storage -- curl -s http://localhost:{{ .Values.userStorage.port }}/health
+
+Verify User Storage SPI is registered in Keycloak:
+  1. Access Keycloak admin console
+  2. Navigate to User Federation
+  3. Verify "user-storage" provider is listed and enabled

@@ -1,0 +1,125 @@
+{{- if .Values.networkPolicies.enabled }}
+# NOTE: Base policies (default-deny-*, allow-dns, allow-egress-same-namespace,
+# allow-egress-to-monitoring) are defined in fineract-infra chart only.
+---
+# Allow traffic to user-storage from azamra-bff and keycloak
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-user-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: user-storage
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: azamra-bff
+        - podSelector:
+            matchLabels:
+              app: azamra-kyc-manager
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: keycloak
+      ports:
+        - protocol: TCP
+          port: {{ .Values.userStorage.port }}
+---
+# Allow user-storage to reach external HTTPS endpoints (e.g. Keycloak OIDC discovery / JWKS)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-user-storage-external
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: user-storage
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+# Allow traffic to azamra-bff from ingress-nginx controller (direct ingress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-azamra-bff
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: azamra-bff
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.azamraBff.port }}
+{{- if .Values.azamraKycManager.enabled }}
+---
+# Allow traffic to azamra-kyc-manager from ingress-nginx controller only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-azamra-kyc-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: azamra-kyc-manager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.azamraKycManager.port }}
+---
+# Allow KYC manager to reach external HTTPS (Keycloak OIDC discovery, public issuer)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-azamra-kyc-manager-external
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: azamra-kyc-manager
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
+{{- end }}

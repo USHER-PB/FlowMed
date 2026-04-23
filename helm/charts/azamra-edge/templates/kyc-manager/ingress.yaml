@@ -1,0 +1,33 @@
+{{- if and .Values.azamraKycManager.enabled .Values.azamraKycManager.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: azamra-kyc-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-kyc-manager
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+  {{- with .Values.azamraKycManager.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.azamraKycManager.ingress.className }}
+  {{- if .Values.azamraKycManager.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.azamraKycManager.ingress.host }}
+      secretName: {{ .Values.azamraKycManager.ingress.tls.secretName | default (printf "%s-tls" "azamra-kyc-manager") }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.azamraKycManager.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: azamra-kyc-manager
+                port:
+                  number: {{ .Values.azamraKycManager.port }}
+{{- end }}

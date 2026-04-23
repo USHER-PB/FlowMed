@@ -1,0 +1,163 @@
+# Azamra Edge Services Helm Chart Values
+# ======================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Secrets configuration
+secrets:
+  mode: generate  # "generate" for local dev, "existing" for K8s with sealed secrets
+
+# Network policies
+networkPolicies:
+  enabled: true
+
+# Global settings
+global:
+  imagePullSecrets: []
+  keycloakUrl: "http://keycloak:8080"
+  keycloakPublicUrl: "http://localhost:8180"
+  realm: fineract
+  otelEndpoint: "http://otel-collector:4317"
+
+# ---------------------------------------------------------------------------
+# Azamra BFF (Spring Boot - Backend for Frontend)
+# ---------------------------------------------------------------------------
+azamraBff:
+  enabled: true
+  image:
+    repository: ghcr.io/skyengpro/azamra-tokenization-bff
+    tag: "develop-arm"  # Use "develop-amd" for amd64 (Hetzner K3s)
+  port: 8080
+  replicas: 1
+  keycloak:
+    issuerUri: ""  # Leave empty to use global keycloakPublicUrl + realm
+    jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
+  services:
+    assetServiceUrl: "http://asset-service:8083/api/v1"
+    cussUrl: "http://customer-self-service:8080"
+    userStorageUrl: "http://user-storage:3000/bff"
+    paymentGatewayUrl: "http://payment-gateway-service:8082"
+  ingress:
+    enabled: false
+    className: nginx
+    host: ""
+    annotations: {}
+    tls:
+      enabled: false
+      secretName: ""
+  security:
+    signatureEnabled: "true"
+    validateIssuer: "true"
+  tracing:
+    enabled: "true"
+    samplingProbability: "0.1"
+  kyc:
+    whatsappLink: "https://wa.link/jprtzd"
+  redis:
+    host: redis
+    port: "6379"
+    password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
+    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ---------------------------------------------------------------------------
+# Azamra KYC Manager (Next.js standalone)
+# ---------------------------------------------------------------------------
+azamraKycManager:
+  enabled: true
+  image:
+    repository: ghcr.io/skyengpro/azamra-tokenization-frontend-kyc-mgr
+    tag: "latest-arm"
+  port: 3000
+  replicas: 1
+  existingSecret: ""  # Set to "kyc-manager-credentials" for K8s with sealed secrets
+  nextAuthUrl: ""  # Set per environment (e.g. https://kyc.dev.azamra.capital)
+  oauth2:
+    issuer: ""  # Leave empty to use global keycloakPublicUrl + realm
+    clientId: "kyc-manager"
+    clientSecret: ""  # REQUIRED: Set OAuth2 client secret for dev, or use existingSecret for K8s
+    scopes: "openid profile email"
+    providerId: "keycloak"
+  apiUrl: "http://user-storage:3000"
+  ingress:
+    enabled: false
+    className: nginx
+    host: kyc.localhost
+    annotations: {}
+    tls:
+      enabled: false
+      secretName: ""
+  redis:
+    host: redis
+    port: "6379"
+    password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
+    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# ---------------------------------------------------------------------------
+# User Storage (Rust - Keybound Backend)
+# ---------------------------------------------------------------------------
+userStorage:
+  enabled: true
+  image:
+    repository: ghcr.io/adorsys-gis/user-storage
+    tag: "master-arm64"
+  port: 3000
+  replicas: 1
+  existingSecret: ""  # Set to "user-storage-credentials" for K8s with sealed secrets
+  database:
+    url: ""  # REQUIRED: Set database URL with credentials, e.g. postgres://user:pass@host:5432/db
+    poolSize: 15
+  redis:
+    url: "redis://redis:6379"
+    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+  minio:
+    endpoint: "http://minio:9000"
+    region: "us-east-1"
+    accessKey: ""  # REQUIRED: Set MinIO access key for dev, or use existingSecret for K8s
+    secretKey: ""  # REQUIRED: Set MinIO secret key for dev, or use existingSecret for K8s
+    bucket: "user-storage-dev"
+    existingSecret: ""  # Set to "data-store-minio" for K8s with sealed secrets
+  oauth2:
+    issuer: ""  # Leave empty to use global keycloakUrl + realm
+    jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
+  kc:
+    enabled: true
+    basePath: "/kc"
+    signatureSecret: ""  # REQUIRED: Set KC signature secret for production
+    maxClockSkewSeconds: 60
+    maxBodyBytes: 262144
+  bff:
+    enabled: true
+    basePath: "/bff"
+  staff:
+    enabled: true
+    basePath: "/staff"
+  cuss:
+    apiUrl: "http://customer-self-service:8080"
+    clientSecret: ""  # REQUIRED: Set CUSS client secret for dev, or use existingSecret for K8s
+    existingSecret: ""  # Set to "customer-self-service-credentials" for K8s with sealed secrets
+  sms:
+    provider: "api"
+    apiBaseUrl: ""
+  otelEndpoint: ""  # Leave empty to use global otelEndpoint
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
