@@ -12,7 +12,7 @@ secrets:
 
 # PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in infra-data-storage)
 postgres:
-  host: postgres            # Service name of the PostgreSQL instance in the same namespace
+  host: data-store-postgres.data-store.svc.cluster.local  # PostgreSQL service in data-store namespace
   port: 5432
   keycloak:
     user: keycloak
