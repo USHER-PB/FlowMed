@@ -8,7 +8,7 @@ global:
     enabled: false
 
 secrets:
-  mode: generate  # "generate" for local, "existing" for cloud
+  mode: existing  # "generate" for local, "existing" for cloud/SealedSecrets
 
 # PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in infra-data-storage)
 postgres:
@@ -18,7 +18,7 @@ postgres:
     user: keycloak
     password: keycloak_password
     database: keycloak
-  existingSecret: ""         # Secret containing KEYCLOAK_DB_USER and KEYCLOAK_DB_PASSWORD
+  existingSecret: "keycloak-postgres"  # SealedSecret containing KEYCLOAK_DB_USER and KEYCLOAK_DB_PASSWORD
 
 networkPolicies:
   enabled: true
@@ -73,7 +73,7 @@ keycloak:
     # and memory utilization will appear permanently high, causing runaway scale-out.
   pdb:
     enabled: false  # Enable when replicas >= 2 (UAT/prod)
-  existingSecret: ""
+  existingSecret: "keycloak-keycloak"  # SealedSecret containing KEYCLOAK_ADMIN and KEYCLOAK_ADMIN_PASSWORD
 
 keycloakConfig:
   enabled: true

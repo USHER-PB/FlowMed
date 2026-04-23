@@ -1,0 +1,17 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: keycloak-keycloak
+  namespace: fineract
+spec:
+  encryptedData:
+    KEYCLOAK_ADMIN: AgCmifVgDNUCSXRD7h2JVnR+a8WQ+870Z7sUzWZH+Qu460I6n16bja3o88auSRb5OWFVyklfloE5mFd4L9RDwaXaWHB+qKA0PxRjam2Cmld4lGRTmMnuuJquD6Pn8Cugz0pKGHh0FiIn56MBXkaPevbA1+vot2MZMcT3mFwP8lZ0dPEPeBup/5GKNCceoULt20dtaU9x3XQtuq7pmJeqa603nquoO1dhKKGvU/01XfIp4XZM0azxVDFIHwjohGgQo8Dndb3pmtKk7/gMN74gBy2Ym0JFr1+MfLQ53DprQXzfioV8rN6AszDbM13+rlfzRnmkDmFyYiMeSlYVhoZoB8AgokyZXoS3ei4oLpRPb522xDQjybOfPnD1C2CZ7oc/LwgfqmBoVETSisKROuyL/pmfx5Ze0XtvbqnO5au6c9PDBwYAkqFqK+HpbBYlKwSYLAIgGMKODVNI9BkeuPUBxSJM19fWJKZoNU3WzzJWUHQLHk97rWhMWbhKth4wUPg+fc6LinJ08sfKgGLUczAbBhkMkRI03+Qwd/AdQNClYQbxkLj3Yrhb4idTCzvasBu6l29kSmlEXEmOV5JibN6Ito0TyH5akd+CbOLM/G2/GspCfGeIiRAMBGhZ6pjL4a4SW0D+fXFVbwb/82CNlYJalovvs0MORoZjstJ42Qo6oopIz/kzY+n9eEINNg7MFgLT3rhYe/Ks5g==
+    KEYCLOAK_ADMIN_PASSWORD: AgBnP3x91ePr0G7ll7acnVM+nL1j2MlvpEONrALXN0a8EIZUfU5syzMZlOZjjVp0WIKFg96Kf+ZnLQiBE9cpFgv7gZQjIN2TTUZAUSPVz2ehfNnWDqqx+TflqB04/oz36ldb/oE33Cu21zp2z2F5byHhBkk3Q+yyFGZ7mQHVnHSAr+xfMBMiHDKn4gijLVG2o7x2g4XpNlzRkkt0HHMs9ZVY5Luf4Jk57OMR5+UGprOJ9hUfyeaQ7tY4J9yvLXIDmftM50uui83u3Cd6NqXK0J/i6GfRAHv0ki6sugxEqzvtP9/Yh5J+SRUb3bSWMQDOLEFFEyEgDEHL8lVv6QvTHwEY+piIPz/dmiFTq540cfnx4uBuxz8FD1TO62KpOb/qmkmhk9itHjtl9Dfjwcy0K+a+tkxv3o6aGqd5NhmvwL190Z+CJkx5gZ1/QsnEfws3aniYP9xz8XR1Rzopby52jNPg24U//llSe3+62g7Z4nV/6xJs9XUbjBE/LFEXrkJH0+ntDQdT14QReK3n31ri/XjrBFGvR+HZEkgbxh3QtrYqso8zEpOQh8MDw+ao01vzce3ByCXqJmTc2L4MxmaaUosf2q1VOkYx9CVUDZ6WN0+UM3F3qISRvrnjwrFvpI5ga9gYshc6G0EVg1uMIFAFn+SYbkWMvzvOZ+yRb3csTzcj2LV4y0I5AXPmqtYiClb9UeiX8TSBMw==
+  template:
+    metadata:
+      creationTimestamp: null
+      name: keycloak-keycloak
+      namespace: fineract
+    type: Opaque
