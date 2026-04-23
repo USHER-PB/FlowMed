@@ -120,12 +120,24 @@ Return the PostgreSQL secret name
 
 {{/*
 Return the PostgreSQL host
+For CNPG, use the -rw service (read-write endpoint)
 */}}
 {{- define "postgres.host" -}}
-{{- if eq .Values.mode "external" }}
-{{- .Values.external.host }}
+{{- if eq .Values.mode "cnpg" }}
+{{- printf "%s-rw.%s.svc.cluster.local" (include "postgres.fullname" .) (include "postgres.namespace" .) }}
 {{- else }}
 {{- printf "%s.%s.svc.cluster.local" (include "postgres.fullname" .) (include "postgres.namespace" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return the PostgreSQL read-only host (for CNPG only)
+*/}}
+{{- define "postgres.readOnlyHost" -}}
+{{- if eq .Values.mode "cnpg" }}
+{{- printf "%s-ro.%s.svc.cluster.local" (include "postgres.fullname" .) (include "postgres.namespace" .) }}
+{{- else }}
+{{- include "postgres.host" . }}
 {{- end }}
 {{- end }}
 
@@ -133,22 +145,14 @@ Return the PostgreSQL host
 Return the PostgreSQL port
 */}}
 {{- define "postgres.port" -}}
-{{- if eq .Values.mode "external" }}
-{{- .Values.external.port }}
-{{- else }}
 {{- .Values.service.port }}
-{{- end }}
 {{- end }}
 
 {{/*
 Return the PostgreSQL connection string
 */}}
 {{- define "postgres.connectionString" -}}
-{{- if eq .Values.mode "external" }}
-{{- printf "postgresql://%s:%s@%s:%s/%s" .Values.external.database .Values.external.host (include "postgres.port" .) .Values.external.database }}
-{{- else }}
 {{- printf "postgresql://%s:%s@%s:%s/%s" .Values.auth.username .Values.auth.database (include "postgres.host" .) (include "postgres.port" .) .Values.auth.database }}
-{{- end }}
 {{- end }}
 
 {{/*
@@ -161,19 +165,19 @@ true
 {{- end }}
 
 {{/*
-Return true if PostgreSQL is enabled and in internal (standalone or ha) mode
+Return true if PostgreSQL is enabled and in CNPG mode
 */}}
-{{- define "postgres.internalEnabled" -}}
-{{- if and .Values.enabled (or (eq .Values.mode "standalone") (eq .Values.mode "ha")) }}
+{{- define "postgres.cnpgEnabled" -}}
+{{- if and .Values.enabled (eq .Values.mode "cnpg") }}
 true
 {{- end }}
 {{- end }}
 
 {{/*
-Return true if PostgreSQL is in external mode
+Return true if PostgreSQL is enabled (any internal mode)
 */}}
-{{- define "postgres.externalEnabled" -}}
-{{- if eq .Values.mode "external" }}
+{{- define "postgres.internalEnabled" -}}
+{{- if .Values.enabled }}
 true
 {{- end }}
 {{- end }}

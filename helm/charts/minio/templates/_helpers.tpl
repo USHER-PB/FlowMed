@@ -129,11 +129,7 @@ Return the MinIO secret name
 Return the MinIO endpoint
 */}}
 {{- define "minio.endpoint" -}}
-{{- if eq .Values.mode "external" }}
-{{- .Values.external.endpoint }}
-{{- else }}
 {{- printf "http://%s.%s.svc.cluster.local:%s" (include "minio.fullname" .) (include "minio.namespace" .) (.Values.service.apiPort | toString) }}
-{{- end }}
 {{- end }}
 
 {{/*
@@ -164,10 +160,68 @@ true
 {{- end }}
 
 {{/*
-Return true if MinIO is in external mode
+Return the number of replicas based on mode
 */}}
-{{- define "minio.externalEnabled" -}}
-{{- if eq .Values.mode "external" }}
+{{- define "minio.replicas" -}}
+{{- if eq .Values.mode "distributed" }}
+{{- .Values.distributed.replicas | default 4 }}
+{{- else }}
+{{- .Values.replicaCount | default 1 }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return the storage size based on mode
+*/}}
+{{- define "minio.storageSize" -}}
+{{- if eq .Values.mode "distributed" }}
+{{- .Values.distributed.storage.size | default "10Gi" }}
+{{- else }}
+{{- .Values.persistence.size | default "5Gi" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return the drives per node for distributed mode
+*/}}
+{{- define "minio.drivesPerNode" -}}
+{{- if eq .Values.mode "distributed" }}
+{{- .Values.distributed.drivesPerNode | default 1 }}
+{{- else }}
+1
+{{- end }}
+{{- end }}
+
+{{/*
+Generate pod anti-affinity for distributed mode
+*/}}
+{{- define "minio.podAntiAffinity" -}}
+{{- if and (eq .Values.mode "distributed") .Values.distributed.podAntiAffinity.enabled }}
+{{- if eq .Values.distributed.podAntiAffinity.type "required" }}
+requiredDuringSchedulingIgnoredDuringExecution:
+  - labelSelector:
+      matchLabels:
+        {{- include "minio.selectorLabels" . | nindent 6 }}
+        app.kubernetes.io/component: server
+    topologyKey: {{ .Values.distributed.podAntiAffinity.topologyKey | default "kubernetes.io/hostname" }}
+{{- else }}
+preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: {{ .Values.distributed.podAntiAffinity.weight | default 100 }}
+    podAffinityTerm:
+      labelSelector:
+        matchLabels:
+          {{- include "minio.selectorLabels" . | nindent 8 }}
+          app.kubernetes.io/component: server
+      topologyKey: {{ .Values.distributed.podAntiAffinity.topologyKey | default "kubernetes.io/hostname" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return true if bucket init job should be created
+*/}}
+{{- define "minio.bucketInitEnabled" -}}
+{{- if and (include "minio.internalEnabled" .) .Values.bucketInit.enabled .Values.buckets }}
 true
 {{- end }}
 {{- end }}
@@ -205,11 +259,3 @@ Return the priority class name
 {{- end }}
 {{- end }}
 
-{{/*
-Return true if bucket init job should be created
-*/}}
-{{- define "minio.bucketInitEnabled" -}}
-{{- if and (include "minio.standaloneEnabled" .) .Values.bucketInit.enabled .Values.buckets }}
-true
-{{- end }}
-{{- end }}

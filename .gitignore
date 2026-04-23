@@ -50,8 +50,10 @@ TODO.md
 # Helm build artifacts
 **/charts/*.tgz
 **/Chart.lock
-!helm/charts/*/Chart.yaml
-!helm/charts/*/charts/.keep
+
+# Ignore embedded chart dependencies (upstream charts downloaded by helm dependency update)
+# This ignores the entire charts/ subdirectory within each wrapper chart
+helm/charts/*/charts/
 
 # Binary tools
 kubeseal*

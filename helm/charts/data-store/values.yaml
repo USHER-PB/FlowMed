@@ -1,3 +1,4 @@
+
 # =============================================================================
 # Data Store Umbrella Chart - Default Values
 # =============================================================================
@@ -19,9 +20,9 @@ global:
 postgres:
   # Enable PostgreSQL deployment
   enabled: true
-  ls
-  # Deployment mode: "standalone" or "external"
-  mode: standalone
+  
+  # Deployment mode: "standalone" or "cnpg"
+  mode: cnpg
   
   # Authentication
   auth:
@@ -47,10 +48,12 @@ postgres:
   # Persistence
   persistence:
     enabled: true
-    size: 5Gi
+    # Reduced size for 2-node cluster with limited storage
+    size: 2Gi
     storageClass: ""
   
-  # Security context for Longhorn compatibility
+  # Security context for Longhorn compatibility (standalone mode only)
+  # CNPG manages its own security context with UID 26
   primary:
     podSecurityContext:
       fsGroup: 999
@@ -70,6 +73,28 @@ postgres:
   networkPolicy:
     enabled: true
     ingressNamespaces: []
+  
+  # CNPG High Availability (when mode: cnpg)
+  # Requires CNPG operator: helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
+  # NOTE: Reduced to 2 instance for 2-node cluster - use 3+ for production HA
+  cnpg:
+    instances: 2
+    postgresql:
+      sharedBuffers: "256MB"
+      effectiveCacheSize: "768MB"
+      maxConnections: "200"
+      maxWalSize: "256MB"  # Must be smaller than walStorage.size (512Mi)
+      minWalSize: "64MB"
+    walStorage:
+      enabled: true
+      # Reduced size for 2-node cluster with limited storage
+      size: "512Mi"
+    storage:
+      resizeInUseVolumes: true
+    affinity:
+      enablePodAntiAffinity: true
+      podAntiAffinityType: "preferred"
+      topologyKey: "kubernetes.io/hostname"
 
 # =============================================================================
 # MinIO Configuration
@@ -78,8 +103,8 @@ minio:
   # Enable MinIO deployment
   enabled: true
   
-  # Deployment mode: "standalone" or "external"
-  mode: standalone
+  # Deployment mode: "standalone" or "distributed"
+  mode: distributed
   
   # Authentication
   auth:
@@ -146,6 +171,29 @@ minio:
   networkPolicy:
     enabled: true
     ingressNamespaces: []
+  
+  # Distributed High Availability (when mode: distributed)
+  # MinIO distributed mode provides erasure coding and data replication
+  # NOTE: Reduced for 2-node cluster - use 4+ nodes for production HA
+  distributed:
+    replicas: 2  # Minimum for 2-node cluster (production: 4, 6, 8, 12, or 16)
+    drivesPerNode: 1
+    storage:
+      # Reduced size for 2-node cluster with limited storage
+      size: 2Gi
+      storageClass: ""
+    podAntiAffinity:
+      enabled: true
+      type: "preferred"  # preferred or required
+      topologyKey: "kubernetes.io/hostname"
+      weight: 100
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 100m
+      limits:
+        memory: 1Gi
+        cpu: 500m
 
 # =============================================================================
 # External Database Configuration (for production)

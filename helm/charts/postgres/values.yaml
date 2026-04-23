@@ -1,8 +1,7 @@
 # =============================================================================
 # PostgreSQL Helm Chart - Default Values
 # =============================================================================
-# Supports standalone mode for local development and external mode for cloud.
-# For production HA, use bitnami/postgresql-ha or CloudNativePG directly.
+# Supports standalone mode for local development and CNPG for HA production.
 # =============================================================================
 
 # =============================================================================
@@ -19,39 +18,16 @@ global:
 # =============================================================================
 # PostgreSQL Deployment Control
 # =============================================================================
-# Enable PostgreSQL deployment (set to false for external databases)
+# Enable PostgreSQL deployment
 enabled: true
 
 # Deployment mode:
 # - "standalone": Single PostgreSQL instance (local/dev)
-# - "ha": High Availability mode (Production)
-# - "external": Use external database (RDS, Cloud SQL, etc.)
+# - "cnpg": CloudNativePG HA cluster (Production - requires CNPG operator)
 mode: standalone
 
-# Number of replicas (used when mode is standalone or ha)
-replicaCount: 1
-
 # =============================================================================
-# External Database Configuration (when mode: external)
-# =============================================================================
-external:
-  # Database host (e.g., mydb.xxxxx.region.rds.amazonaws.com)
-  host: ""
-  # Database port
-  port: 5432
-  # Database name
-  database: ""
-  # Existing secret containing credentials
-  existingSecret: ""
-  # Keys within the secret
-  secretKeys:
-    username: username
-    password: password
-    # For connection strings
-    connectionString: ""
-
-# =============================================================================
-# Internal PostgreSQL Configuration (when mode: standalone)
+# PostgreSQL Image Configuration
 # =============================================================================
 image:
   repository: postgres
@@ -323,3 +299,174 @@ pdb:
 # =============================================================================
 commonLabels: {}
 commonAnnotations: {}
+
+# =============================================================================
+# CloudNativePG Configuration (when mode: cnpg)
+# =============================================================================
+# CloudNativePG provides production-grade HA PostgreSQL on Kubernetes.
+# Requires the CNPG operator to be installed first:
+#   helm repo add cnpg https://cloudnative-pg.github.io/charts
+#   helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
+cnpg:
+  # Number of PostgreSQL instances (1 primary + N replicas)
+  # Minimum 3 recommended for HA (1 primary + 2 replicas)
+  instances: 3
+  
+  # PostgreSQL image (defaults to image.repository:image.tag)
+  imageName: ""
+  
+  # PostgreSQL configuration
+  postgresql:
+    # Memory
+    sharedBuffers: "256MB"
+    effectiveCacheSize: "768MB"
+    workMem: "16MB"
+    maintenanceWorkMem: "128MB"
+    # Connections
+    maxConnections: "200"
+    # WAL (maxWalSize must be smaller than walStorage.size)
+    walLevel: "replica"
+    maxWalSize: "512MB"
+    minWalSize: "128MB"
+    # Checkpoints
+    checkpointCompletionTarget: "0.9"
+    # Query planning
+    randomPageCost: "1.1"
+    effectiveIoConcurrency: "200"
+    # Parallel queries
+    maxParallelWorkersPerGather: "2"
+    maxParallelWorkers: "4"
+    # Logging
+    logStatement: "ddl"
+    logMinDurationStatement: "1000"
+    # Additional parameters
+    extraParameters: {}
+    # pg_hba.conf rules
+    pgHBA: []
+    # - host all all 10.0.0.0/8 scram-sha-256
+    # - host all all 172.16.0.0/12 scram-sha-256
+    # Synchronous replication for data durability
+    synchronous:
+      method: "any"  # any, first, or off
+      number: 1
+      dataDurability: "required"  # required, preferred, or off
+  
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      # Secret containing app user credentials
+      secret: ""
+      # Post-init SQL commands
+      postInitSQL: []
+      # - CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+      postInitApplicationSQL: []
+      # Initdb options
+      options: []
+    # Recovery from backup (for replica clusters)
+    recovery:
+      source: ""
+      targetTime: ""
+  
+  # Application secret (for app user)
+  appSecret: ""
+  
+  # Storage configuration
+  storage:
+    resizeInUseVolumes: true
+    pvcTemplate: {}
+  
+  # WAL storage (separate from data)
+  walStorage:
+    enabled: true
+    size: "1Gi"
+  
+  # Affinity for HA pod distribution
+  affinity:
+    # Enable pod anti-affinity to spread instances across nodes
+    enablePodAntiAffinity: true
+    # Type: "required" (hard) or "preferred" (soft)
+    podAntiAffinityType: "preferred"
+    # Topology key for anti-affinity
+    topologyKey: "kubernetes.io/hostname"
+    # Node affinity
+    nodeAffinity: {}
+  
+  # Primary update strategy
+  primaryUpdateStrategy: "unsupervised"  # supervised, unsupervised
+  primaryUpdateMethod: "restart"  # restart, switchover
+  
+  # Backup configuration (Barman)
+  backup:
+    enabled: false
+    # S3/MinIO destination path
+    destinationPath: ""
+    # Endpoint URL (for MinIO)
+    endpointURL: ""
+    # S3 credentials secret
+    s3Credentials:
+      secretName: ""
+      accessKeyIdKey: "access-key-id"
+      secretAccessKeyKey: "secret-access-key"
+    # WAL archiving
+    wal:
+      compression: "gzip"
+      maxParallel: 2
+      minFlushInterval: "5s"
+    # Data backups
+    data:
+      compression: "gzip"
+      immediateCheckpoint: false
+      jobs: 2
+    # Retention policy
+    retentionPolicy: "30d"
+  
+  # Monitoring
+  monitoring:
+    customQueries: []
+    # - name: "pg_stat_statements"
+    #   query: "SELECT * FROM pg_stat_statements"
+    #   metrics:
+    #     - query_duration_seconds:
+    #         usage: "GAUGE"
+    #         description: "Query duration"
+  
+  # Replication slots
+  replicationSlots:
+    enabled: true
+    slotPrefix: "_cnpg_"
+    synchronizeReplicas: {}
+  
+  # Log level
+  logLevel: "info"
+  
+  # PostgreSQL UID/GID
+  # NOTE: CNPG images use UID 26, standard postgres images use UID 999
+  # Leave empty for CNPG to use its default (26)
+  # Only set for standalone mode with standard postgres images
+  postgresUID: ""
+  postgresGID: ""
+  
+  # Extra volumes
+  extraVolumes: []
+  
+  # Extra volume mounts
+  extraVolumeMounts: []
+  
+  # Sidecar containers
+  sidecars: []
+  
+  # Environment variables
+  env: []
+  envFrom: []
+  
+  # Annotations for the cluster
+  annotations: {}
+  
+  # Tablespaces configuration
+  tablespaces: []
+  
+  # Inheritance (for replica clusters)
+  inheritance: {}
+  
+  # External clusters (for distributed topology)
+  externalClusters: []

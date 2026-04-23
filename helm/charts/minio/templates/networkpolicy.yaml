@@ -1,4 +1,4 @@
-{{- if and .Values.networkPolicy.enabled (include "minio.standaloneEnabled" .) }}
+{{- if .Values.networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -75,6 +75,21 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+    {{- if not (include "minio.standaloneEnabled" .) }}
+    # Distributed mode: Allow inter-pod communication for erasure coding
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "minio.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: server
+      ports:
+        - port: {{ .Values.service.apiPort }}
+          protocol: TCP
+        {{- if .Values.console.enabled }}
+        - port: {{ .Values.service.consolePort }}
+          protocol: TCP
+        {{- end }}
+    {{- end }}
     {{- with .Values.networkPolicy.egress }}
     # Custom egress rules
     {{- toYaml . | nindent 4 }}

@@ -1,0 +1,389 @@
+{{/*
+CloudNativePG Cluster template
+Only rendered when mode is "cnpg" and CNPG operator is available
+*/}}
+{{- if and .Values.enabled (eq .Values.mode "cnpg") }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "postgres.fullname" . }}
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+    cnpg.io/cluster: {{ include "postgres.fullname" . }}
+  {{- with .Values.cnpg.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- /*
+  Cluster instances (1 primary + N replicas)
+  */}}
+  instances: {{ .Values.cnpg.instances | default 3 }}
+  
+  {{- /*
+  PostgreSQL image configuration
+  CNPG requires specific images from ghcr.io/cloudnative-pg/postgresql
+  Standard postgres images don't work because initdb doesn't run the entrypoint
+  */}}
+  {{- if .Values.cnpg.imageName }}
+  imageName: {{ .Values.cnpg.imageName }}
+  {{- else }}
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
+  {{- end }}
+  imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+  
+  {{- with .Values.global.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  PostgreSQL version and configuration
+  */}}
+  postgresql:
+    parameters:
+      # Memory configuration
+      shared_buffers: {{ .Values.cnpg.postgresql.sharedBuffers | default "256MB" }}
+      effective_cache_size: {{ .Values.cnpg.postgresql.effectiveCacheSize | default "768MB" }}
+      work_mem: {{ .Values.cnpg.postgresql.workMem | default "16MB" }}
+      maintenance_work_mem: {{ .Values.cnpg.postgresql.maintenanceWorkMem | default "128MB" }}
+      # Connections
+      max_connections: {{ .Values.cnpg.postgresql.maxConnections | default "200" | quote }}
+      # WAL configuration
+      wal_level: {{ .Values.cnpg.postgresql.walLevel | default "replica" }}
+      max_wal_size: {{ .Values.cnpg.postgresql.maxWalSize | default "512MB" }}
+      min_wal_size: {{ .Values.cnpg.postgresql.minWalSize | default "128MB" }}
+      # Checkpoints
+      checkpoint_completion_target: {{ .Values.cnpg.postgresql.checkpointCompletionTarget | default "0.9" | quote }}
+      # Query planning
+      random_page_cost: {{ .Values.cnpg.postgresql.randomPageCost | default "1.1" | quote }}
+      effective_io_concurrency: {{ .Values.cnpg.postgresql.effectiveIoConcurrency | default "200" | quote }}
+      # Parallel queries
+      max_parallel_workers_per_gather: {{ .Values.cnpg.postgresql.maxParallelWorkersPerGather | default "2" | quote }}
+      max_parallel_workers: {{ .Values.cnpg.postgresql.maxParallelWorkers | default "4" | quote }}
+      # Logging
+      log_statement: {{ .Values.cnpg.postgresql.logStatement | default "ddl" }}
+      log_min_duration_statement: {{ .Values.cnpg.postgresql.logMinDurationStatement | default "1000" | quote }}
+      {{- with .Values.cnpg.postgresql.extraParameters }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- if .Values.cnpg.postgresql.pgHBA }}
+    pg_hba:
+      {{- toYaml .Values.cnpg.postgresql.pgHBA | nindent 6 }}
+    {{- end }}
+    synchronous:
+      method: {{ .Values.cnpg.postgresql.synchronous.method | default "any" }}
+      number: {{ .Values.cnpg.postgresql.synchronous.number | default 1 }}
+      dataDurability: {{ .Values.cnpg.postgresql.synchronous.dataDurability | default "required" }}
+  
+  {{- /*
+  Bootstrap configuration
+  */}}
+  bootstrap:
+    {{- if .Values.cnpg.bootstrap.initdb }}
+    initdb:
+      database: {{ .Values.auth.database | default "appdb" }}
+      owner: {{ .Values.auth.username | default "appuser" }}
+      {{- if .Values.cnpg.bootstrap.initdb.secret }}
+      secret:
+        name: {{ .Values.cnpg.bootstrap.initdb.secret }}
+      {{- else if .Values.auth.existingSecret }}
+      secret:
+        name: {{ .Values.auth.existingSecret }}
+      {{- end }}
+      {{- with .Values.cnpg.bootstrap.initdb.postInitSQL }}
+      postInitSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cnpg.bootstrap.initdb.postInitApplicationSQL }}
+      postInitApplicationSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cnpg.bootstrap.initdb.options }}
+      options:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if and .Values.cnpg.bootstrap.recovery .Values.cnpg.bootstrap.recovery.source }}
+    recovery:
+      source: {{ .Values.cnpg.bootstrap.recovery.source }}
+      {{- if .Values.cnpg.bootstrap.recovery.targetTime }}
+      recoveryTarget:
+        targetTime: {{ .Values.cnpg.bootstrap.recovery.targetTime }}
+      {{- end }}
+    {{- end }}
+  
+  {{- /*
+  Superuser and application secrets
+  */}}
+  {{- if .Values.auth.existingSecret }}
+  superuserSecret:
+    name: {{ .Values.auth.existingSecret }}
+  {{- end }}
+  
+  {{- /*
+  Storage configuration
+  */}}
+  storage:
+    size: {{ .Values.persistence.size | default "5Gi" }}
+    {{- if .Values.persistence.storageClass }}
+    storageClass: {{ .Values.persistence.storageClass }}
+    {{- end }}
+    {{- with .Values.cnpg.storage.resizeInUseVolumes }}
+    resizeInUseVolumes: {{ . }}
+    {{- end }}
+    {{- with .Values.cnpg.storage.pvcTemplate }}
+    pvcTemplate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  
+  {{- /*
+  WAL storage (separate from data)
+  */}}
+  {{- if .Values.cnpg.walStorage.enabled }}
+  walStorage:
+    size: {{ .Values.cnpg.walStorage.size | default "1Gi" }}
+    {{- if .Values.persistence.storageClass }}
+    storageClass: {{ .Values.persistence.storageClass }}
+    {{- end }}
+  {{- end }}
+  
+  {{- /*
+  Resource allocation
+  */}}
+  resources:
+    requests:
+      memory: {{ .Values.resources.requests.memory | default "256Mi" }}
+      cpu: {{ .Values.resources.requests.cpu | default "100m" }}
+    limits:
+      memory: {{ .Values.resources.limits.memory | default "512Mi" }}
+      cpu: {{ .Values.resources.limits.cpu | default "500m" }}
+  
+  {{- /*
+  Affinity configuration for HA
+  */}}
+  affinity:
+    {{- if .Values.cnpg.affinity.enablePodAntiAffinity }}
+    podAntiAffinityType: {{ .Values.cnpg.affinity.podAntiAffinityType | default "preferred" }}
+    {{- end }}
+    {{- with .Values.cnpg.affinity.topologyKey }}
+    topologyKey: {{ . }}
+    {{- end }}
+    {{- with .Values.cnpg.affinity.nodeAffinity }}
+    nodeAffinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  
+  {{- /*
+  Node selector, tolerations
+  */}}
+  {{- with .Values.primary.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- with .Values.primary.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Priority class
+  */}}
+  {{- if or .Values.priorityClassName .Values.global.priorityClassName }}
+  priorityClassName: {{ .Values.priorityClassName | default .Values.global.priorityClassName }}
+  {{- end }}
+  
+  {{- /*
+  Primary update strategy
+  */}}
+  primaryUpdateStrategy: {{ .Values.cnpg.primaryUpdateStrategy | default "unsupervised" }}
+  primaryUpdateMethod: {{ .Values.cnpg.primaryUpdateMethod | default "restart" }}
+  
+  {{- /*
+  Backup configuration
+  */}}
+  {{- if .Values.cnpg.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      destinationPath: {{ .Values.cnpg.backup.destinationPath }}
+      {{- if .Values.cnpg.backup.endpointURL }}
+      endpointURL: {{ .Values.cnpg.backup.endpointURL }}
+      {{- end }}
+      {{- if .Values.cnpg.backup.s3Credentials }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ .Values.cnpg.backup.s3Credentials.secretName }}
+          key: {{ .Values.cnpg.backup.s3Credentials.accessKeyIdKey | default "access-key-id" }}
+        secretAccessKey:
+          name: {{ .Values.cnpg.backup.s3Credentials.secretName }}
+          key: {{ .Values.cnpg.backup.s3Credentials.secretAccessKeyKey | default "secret-access-key" }}
+      {{- end }}
+      {{- if .Values.cnpg.backup.wal }}
+      wal:
+        compression: {{ .Values.cnpg.backup.wal.compression | default "gzip" }}
+        maxParallel: {{ .Values.cnpg.backup.wal.maxParallel | default 2 }}
+        minFlushInterval: {{ .Values.cnpg.backup.wal.minFlushInterval | default "5s" }}
+      {{- end }}
+      {{- if .Values.cnpg.backup.data }}
+      data:
+        compression: {{ .Values.cnpg.backup.data.compression | default "gzip" }}
+        immediateCheckpoint: {{ .Values.cnpg.backup.data.immediateCheckpoint | default false }}
+        jobs: {{ .Values.cnpg.backup.data.jobs | default 2 }}
+      {{- end }}
+    {{- if .Values.cnpg.backup.retentionPolicy }}
+    retentionPolicy: {{ .Values.cnpg.backup.retentionPolicy }}
+    {{- end }}
+  {{- end }}
+  
+  {{- /*
+  Monitoring configuration
+  */}}
+  {{- if .Values.monitoring.enabled }}
+  monitoring:
+    enablePodMonitor: {{ .Values.monitoring.serviceMonitor.enabled | default true }}
+    {{- if .Values.cnpg.monitoring.customQueries }}
+    customQueries:
+      {{- toYaml .Values.cnpg.monitoring.customQueries | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  
+  {{- /*
+  Service account configuration
+  */}}
+  serviceAccountTemplate:
+    metadata:
+      labels:
+        {{- include "postgres.labels" . | nindent 8 }}
+      {{- with .Values.serviceAccount.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  
+  {{- /*
+  Additional volumes
+  */}}
+  {{- with .Values.cnpg.extraVolumes }}
+  extraVolumes:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Additional volume mounts
+  */}}
+  {{- with .Values.cnpg.extraVolumeMounts }}
+  extraVolumeMounts:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Sidecar containers
+  */}}
+  {{- with .Values.cnpg.sidecars }}
+  sidecars:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Environment variables
+  */}}
+  {{- with .Values.cnpg.env }}
+  env:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- with .Values.cnpg.envFrom }}
+  envFrom:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Projected volume token
+  */}}
+  projectedVolumeToken:
+    {{- if .Values.cnpg.projectedVolumeToken }}
+    {{- toYaml .Values.cnpg.projectedVolumeToken | nindent 4 }}
+    {{- end }}
+  
+  {{- /*
+  Replication slots (for HA)
+  */}}
+  replicationSlots:
+    highAvailability:
+      enabled: {{ .Values.cnpg.replicationSlots.enabled | default true }}
+      slotPrefix: {{ .Values.cnpg.replicationSlots.slotPrefix | default "_cnpg_" }}
+    {{- with .Values.cnpg.replicationSlots.synchronizeReplicas }}
+    synchronizeReplicas:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  
+  {{- /*
+  Liveness probe
+  */}}
+  livenessProbe:
+    enabled: {{ .Values.livenessProbe.enabled | default true }}
+    initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default 30 }}
+    periodSeconds: {{ .Values.livenessProbe.periodSeconds | default 15 }}
+    timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default 5 }}
+    failureThreshold: {{ .Values.livenessProbe.failureThreshold | default 3 }}
+  
+  {{- /*
+  Readiness probe
+  */}}
+  readinessProbe:
+    enabled: {{ .Values.readinessProbe.enabled | default true }}
+    initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default 10 }}
+    periodSeconds: {{ .Values.readinessProbe.periodSeconds | default 10 }}
+    timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default 5 }}
+    failureThreshold: {{ .Values.readinessProbe.failureThreshold | default 3 }}
+  
+  {{- /*
+  Startup probe
+  */}}
+  startupProbe:
+    enabled: {{ .Values.startupProbe.enabled | default true }}
+    initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds | default 10 }}
+    periodSeconds: {{ .Values.startupProbe.periodSeconds | default 10 }}
+    timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds | default 5 }}
+    failureThreshold: {{ .Values.startupProbe.failureThreshold | default 30 }}
+  
+  {{- /*
+  Log level
+  */}}
+  logLevel: {{ .Values.cnpg.logLevel | default "info" }}
+  
+  {{- /*
+  Inheritance (for replica clusters)
+  */}}
+  {{- if .Values.cnpg.inheritance }}
+  inheritance:
+    {{- toYaml .Values.cnpg.inheritance | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  External clusters (for distributed topology)
+  */}}
+  {{- if .Values.cnpg.externalClusters }}
+  externalClusters:
+    {{- toYaml .Values.cnpg.externalClusters | nindent 4 }}
+  {{- end }}
+  
+  {{- /*
+  Postgres configuration (UID/GID)
+  */}}
+  {{- if .Values.cnpg.postgresUID }}
+  postgresUID: {{ .Values.cnpg.postgresUID }}
+  {{- end }}
+  {{- if .Values.cnpg.postgresGID }}
+  postgresGID: {{ .Values.cnpg.postgresGID }}
+  {{- end }}
+  
+  {{- /*
+  Tablespaces
+  */}}
+  {{- if .Values.cnpg.tablespaces }}
+  tablespaces:
+    {{- toYaml .Values.cnpg.tablespaces | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -159,11 +159,15 @@ For production, you typically use managed services (RDS, S3). In this case, **do
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `postgres.enabled` | Enable PostgreSQL deployment | `true` |
-| `postgres.mode` | PostgreSQL mode (`standalone` or `external`) | `standalone` |
+| `postgres.mode` | PostgreSQL mode (`standalone` or `cnpg`) | `standalone` |
 | `minio.enabled` | Enable MinIO deployment | `true` |
-| `minio.mode` | MinIO mode (`standalone` or `external`) | `standalone` |
+| `minio.mode` | MinIO mode (`standalone` or `distributed`) | `standalone` |
 
-> **Note**: When a subchart has `enabled: false` or `mode: external`, no Kubernetes resources are created for that service. This is intentional - use external managed services instead.
+> **Note**: Use `cnpg` mode for PostgreSQL HA and `distributed` mode for MinIO HA in production.
+
+> **Documentation**: For detailed configuration options, see the individual chart documentation:
+> - **PostgreSQL**: [../postgres/README.md](../postgres/README.md) - CNPG mode, synchronous replication, backups
+> - **MinIO**: [../minio/README.md](../minio/README.md) - Distributed mode, erasure coding, bucket initialization
 
 ### PostgreSQL Configuration
 
@@ -208,6 +212,52 @@ minio:
   enabled: true
   mode: standalone
 ```
+
+### Production HA (On-Premises)
+
+For production with high availability, use CNPG and distributed MinIO:
+
+```yaml
+postgres:
+  enabled: true
+  mode: cnpg
+  cnpg:
+    instances: 3
+    affinity:
+      enablePodAntiAffinity: true
+
+minio:
+  enabled: true
+  mode: distributed
+  distributed:
+    replicas: 4
+    podAntiAffinity:
+      enabled: true
+```
+
+#### Prerequisites for HA Mode
+
+1. **CloudNativePG Operator** (required for PostgreSQL HA):
+   ```bash
+   helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
+   ```
+
+2. **Sealed Secrets** (for GitOps-compatible secrets):
+   ```bash
+   # Install sealed-secrets controller
+   helm install sealed-secrets sealed-secrets/sealed-secrets -n kube-system
+   
+   # Create sealed secrets for credentials
+   # See configs/secrets-templates/ for examples
+   ```
+
+3. **Storage Class** with volume expansion support (for PVC resizing)
+
+> **Important Notes**:
+> - CNPG requires specific PostgreSQL images from `ghcr.io/cloudnative-pg/postgresql` (not standard `postgres` images)
+> - CNPG images use UID 26 - do not set `postgresUID`/`postgresGID` in CNPG mode
+> - MinIO distributed mode requires network policies to allow inter-pod communication (automatically configured)
+> - Minimum 2 nodes required for HA (3+ recommended for production)
 
 ### Mixed Mode Examples
 

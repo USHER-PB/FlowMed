@@ -1,16 +1,17 @@
 # PostgreSQL Helm Chart
 
-A PostgreSQL Helm chart for the OM Platform. Supports standalone mode for local development and external mode for cloud databases (RDS, Cloud SQL, etc.).
+A PostgreSQL Helm chart for the OM Platform. Supports standalone mode for local development and CloudNativePG for production HA.
 
 ## Features
 
 - **Standalone Mode**: Single PostgreSQL instance for local development
-- **External Mode**: Reference external databases (RDS, Cloud SQL, etc.) - no resources deployed
+- **CloudNativePG (CNPG)**: High Availability with automatic failover for production
 - **Auto-generated Credentials**: Secure random passwords when not specified
 - **Network Policies**: Optional network isolation
 - **Persistence**: Configurable storage with PVC support
 - **Health Checks**: Liveness, readiness, and startup probes
 - **Additional Databases**: Create multiple databases and users
+- **Synchronous Replication**: Zero data loss with CNPG synchronous mode
 
 ## Quick Start
 
@@ -22,82 +23,74 @@ helm dependency build ./helm/charts/postgres
 
 # Install the chart
 helm install postgres ./helm/charts/postgres \
-  -f values-local.yaml \
   -n development --create-namespace
 ```
 
-### Production (External Database)
+### Production (CloudNativePG HA)
 
-For production, you typically use a managed database service (RDS, Cloud SQL). In this case, **do not install this chart**. Instead:
+For production on-premises deployments requiring high availability:
 
-1. Create a secret with your external database credentials using a secure method:
-   
-   **Option A: External Secrets Operator (Recommended)**
-   ```yaml
-   apiVersion: external-secrets.io/v1beta1
-   kind: ExternalSecret
-   metadata:
-     name: rds-credentials
-     namespace: production
-   spec:
-     refreshInterval: 1h
-     secretStoreRef:
-       name: aws-secretsmanager
-       kind: SecretStore
-     target:
-       name: rds-credentials
-     data:
-       - secretKey: username
-         remoteRef:
-           key: prod/database/credentials
-           property: username
-       - secretKey: password
-         remoteRef:
-           key: prod/database/credentials
-           property: password
-   ```
+#### Prerequisites
 
-   **Option B: Sealed Secrets**
-   ```bash
-   # Create a temporary secret
-   kubectl create secret generic rds-credentials \
-     --from-literal=username=appuser \
-     --from-literal=password=$(openssl rand -base64 32) \
-     -n production --dry-run=client -o yaml > secret.yaml
-   
-   # Seal it
-   kubeseal --format yaml < secret.yaml > sealed-secret.yaml
-   
-   # Apply the sealed secret
-   kubectl apply -f sealed-secret.yaml
-   ```
+1. **Install CloudNativePG Operator** (required for CNPG mode):
 
-   **Option C: kubectl create (for manual setup)**
-   ```bash
-   kubectl create secret generic rds-credentials \
-     --from-literal=username=appuser \
-     --from-literal=password=$(openssl rand -base64 32) \
-     -n production
-   ```
+```bash
+# Install CNPG operator via Helm (recommended)
+helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
 
-2. Configure your application to use the external database directly:
-   ```yaml
-   env:
-     - name: DATABASE_HOST
-       value: "mydb.xxxxx.region.rds.amazonaws.com"
-     - name: DATABASE_PORT
-       value: "5432"
-     - name: DATABASE_USER
-       valueFrom:
-         secretKeyRef:
-           name: rds-credentials
-           key: username
-     - name: DATABASE_PASSWORD
-       valueFrom:
-         secretKeyRef:
-           name: rds-credentials
-           key: password
-   ```
+# Verify operator is running
+kubectl get pods -n cnpg-system
+```
+
+> **Why CNPG?** CloudNativePG is a Kubernetes-native PostgreSQL operator that provides:
+> - High availability with automatic failover
+> - Synchronous replication for zero data loss
+> - Integrated backup/restore with S3 support
+> - Rolling updates without downtime
+> - Native Kubernetes integration
+
+2. **Create Sealed Secret for Credentials** (using kubeseal):
+
+```bash
+# Create Kubernetes secret manifest
+cat <<EOF > postgres-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: production
+type: Opaque
+stringData:
+  username: appuser
+  password: <your-secure-password>
+  postgres-password: <your-superuser-password>
+EOF
+
+# Seal the secret with kubeseal
+kubeseal --format yaml < postgres-secret.yaml > postgres-sealed.yaml
+
+# Apply the sealed secret
+kubectl apply -f postgres-sealed.yaml
+
+# Clean up unsealed secret (never commit this)
+rm postgres-secret.yaml
+```
+
+#### Deploy PostgreSQL
+
+```bash
+# Install PostgreSQL with CNPG (3 instances for HA)
+helm install postgres ./helm/charts/postgres \
+  --set mode=cnpg \
+  --set cnpg.instances=3 \
+  --set auth.existingSecret=postgres-credentials \
+  --set auth.database=appdb \
+  --set auth.username=appuser \
+  --set networkPolicy.ingressNamespaces[0]=your-app-namespace \
+  -n production --create-namespace
+```
+
+> **Note**: For cloud deployments, consider using managed database services (AWS RDS, Google Cloud SQL, Azure Database) instead of self-hosted PostgreSQL.
 
 ## Configuration
 
@@ -106,9 +99,7 @@ For production, you typically use a managed database service (RDS, Cloud SQL). I
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `enabled` | Enable PostgreSQL deployment | `true` |
-| `mode` | Deployment mode (`standalone` or `external`) | `standalone` |
-
-> **Note**: When `enabled: false` or `mode: external`, no Kubernetes resources are created. This is intentional - use external managed services instead.
+| `mode` | Deployment mode (`standalone` or `cnpg`) | `standalone` |
 
 ### Standalone Mode
 
@@ -116,34 +107,124 @@ For production, you typically use a managed database service (RDS, Cloud SQL). I
 |-----------|-------------|---------|
 | `image.repository` | PostgreSQL image repository | `postgres` |
 | `image.tag` | PostgreSQL image tag | `17-alpine` |
-| `auth.database` | Database name | `appdb` |
-| `auth.username` | Application username | `appuser` |
-| `auth.password` | Application password (auto-generated if empty) | `""` |
-| `auth.postgresPassword` | Superuser password (auto-generated if empty) | `""` |
+| `auth.postgresPassword` | Postgres user password (auto-generated if empty) | `""` |
+| `auth.database` | Default database name | `appdb` |
+| `auth.username` | Application user name | `appuser` |
 | `auth.existingSecret` | Use existing secret for credentials | `""` |
+| `persistence.size` | Storage size | `5Gi` |
 
 > **Security Note**: For production or any non-local environment, always use `auth.existingSecret` with a properly managed secret. Never commit passwords to git.
 
-### External Mode (Reference Only)
+### CloudNativePG (CNPG) Mode
 
-When using an external database, these values are for reference/connection purposes only:
+CloudNativePG provides production-grade PostgreSQL with high availability, automatic failover, and backup support.
+
+> **Important**: CNPG requires specific PostgreSQL images from `ghcr.io/cloudnative-pg/postgresql`. Standard `postgres:17-alpine` images will NOT work because CNPG's initdb doesn't run the Docker entrypoint script. The chart defaults to `ghcr.io/cloudnative-pg/postgresql:17.2`.
+
+> **UID/GID Note**: CNPG images use UID 26 (postgres user). Do NOT set `postgresUID` or `postgresGID` values in CNPG mode - leave them empty to use CNPG defaults.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `external.host` | External database host | `""` |
-| `external.port` | External database port | `5432` |
-| `external.database` | External database name | `""` |
-| `external.existingSecret` | Secret containing credentials | `""` |
+| `cnpg.instances` | Number of PostgreSQL instances (min 2 for HA) | `3` |
+| `cnpg.imageName` | PostgreSQL image (CNPG-specific required) | `ghcr.io/cloudnative-pg/postgresql:17.2` |
+| `cnpg.storage.resizeInUseVolumes` | Allow resizing PVCs | `true` |
+| `cnpg.walStorage.enabled` | Enable separate WAL storage | `true` |
+| `cnpg.walStorage.size` | WAL storage size | `1Gi` |
+
+#### PostgreSQL Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cnpg.postgresql.sharedBuffers` | Shared buffers | `256MB` |
+| `cnpg.postgresql.maxConnections` | Max connections | `200` |
+| `cnpg.postgresql.parameters` | Additional PostgreSQL parameters | `{}` |
+
+#### Synchronous Replication
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cnpg.postgresql.synchronous.method` | Synchronous method (`any` or `first`) | `any` |
+| `cnpg.postgresql.synchronous.number` | Number of synchronous replicas | `1` |
+| `cnpg.postgresql.synchronous.dataDurability` | Data durability policy | `required` |
+
+#### Backup Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cnpg.backup.enabled` | Enable Barman backup | `false` |
+| `cnpg.backup.endpointURL` | S3 endpoint URL | `""` |
+| `cnpg.backup.destinationPath` | S3 bucket path | `""` |
+| `cnpg.backup.s3Credentials.secretName` | Secret with S3 credentials | `""` |
+| `cnpg.backup.retentionPolicy` | Retention policy | `30d` |
+
+#### Resource Allocation
+
+Resources are configured at the global level for standalone mode. CNPG uses the same resources for all instances.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `resources.requests.memory` | Memory request | `256Mi` |
+| `resources.requests.cpu` | CPU request | `100m` |
+| `resources.limits.memory` | Memory limit | `512Mi` |
+| `resources.limits.cpu` | CPU limit | `500m` |
+
+#### Pod Anti-Affinity
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cnpg.affinity.enablePodAntiAffinity` | Enable pod anti-affinity | `true` |
+| `cnpg.affinity.podAntiAffinityType` | Anti-affinity type (`preferred` or `required`) | `preferred` |
+| `cnpg.affinity.topologyKey` | Topology key | `kubernetes.io/hostname` |
+
+### CNPG Services
+
+When running in CNPG mode, three services are created:
+
+| Service | Purpose | Usage |
+|---------|---------|-------|
+| `postgres-rw` | Read-Write | Primary instance for writes |
+| `postgres-ro` | Read-Only | Replicas for read queries |
+| `postgres-r` | All Replicas | Any instance (read or write) |
+
+Applications should use `postgres-rw` for write operations and `postgres-ro` for read operations.
+
+### Additional Databases
+
+Create additional databases and users:
+
+```yaml
+additionalDatabases:
+  - name: analytics
+    user: analytics_user
+    password: ""  # Auto-generated
+  - name: reporting
+    user: reporting_user
+    password: ""  # Auto-generated
+```
+
+### Init Scripts
+
+Run initialization scripts on first start:
+
+```yaml
+initScripts:
+  enabled: true
+  scripts:
+    01-schema.sql: |
+      CREATE SCHEMA IF NOT EXISTS app;
+      GRANT ALL ON SCHEMA app TO app_user;
+```
 
 ### Persistence
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `persistence.enabled` | Enable persistence | `true` |
-| `persistence.size` | Storage size | `5Gi` |
 | `persistence.storageClass` | Storage class | `""` |
+| `persistence.accessModes` | Access modes | `["ReadWriteOnce"]` |
+| `persistence.annotations` | PVC annotations | `{}` |
 
-### Resources
+### Resources (Standalone)
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
@@ -156,89 +237,141 @@ When using an external database, these values are for reference/connection purpo
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `networkPolicy.enabled` | Enable network policy | `true` |
-| `networkPolicy.ingressNamespaces` | Namespaces allowed to connect | `[]` |
+| `networkPolicy.enabled` | Enable network policies | `true` |
+| `networkPolicy.ingressNamespaces` | Allowed ingress namespaces | `[]` |
 
 ### Monitoring
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `monitoring.enabled` | Enable Prometheus pod annotations | `false` |
-| `monitoring.prometheusPort` | Prometheus exporter port | `9187` |
-| `monitoring.serviceMonitor.enabled` | Create ServiceMonitor resource | `false` |
+| `monitoring.enabled` | Enable Prometheus monitoring | `false` |
 
-## Additional Databases
+## Accessing PostgreSQL
 
-Create additional databases and users:
+### Port Forward (Local)
 
-```yaml
-additionalDatabases:
-  - name: keycloak
-    user: keycloak
-    password: ""  # Auto-generated
-  - name: tenants
-    user: tenant_admin
-    password: ""  # Auto-generated
+```bash
+kubectl port-forward svc/postgres 5432:5432 -n development
 ```
 
-## Init Scripts
-
-Run custom SQL scripts on first start:
-
-```yaml
-initScripts:
-  01-init.sql: |
-    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-```
-
-## Connecting to PostgreSQL
-
-### From within the cluster
+### Connect using psql
 
 ```bash
 # Get the password
-export PGPASSWORD=$(kubectl get secret postgres -n <namespace> -o jsonpath="{.data.password}" | base64 -d)
+kubectl get secret postgres -n development -o jsonpath='{.data.postgres-password}' | base64 -d
 
 # Connect using psql
-kubectl run psql-client --rm -it --image=postgres:17-alpine -- \
-  psql -h postgres.<namespace>.svc.cluster.local -U appuser -d appdb
+PGPASSWORD=<password> psql -h localhost -U postgres -d appdb
 ```
 
-### Port forward for local access
+### CNPG Connection
+
+For CNPG mode, use the appropriate service:
 
 ```bash
-kubectl port-forward svc/postgres 5432:5432 -n <namespace>
-psql -h localhost -U appuser -d appdb
+# Read-Write (Primary)
+PGPASSWORD=<password> psql -h postgres-rw.production.svc.cluster.local -U postgres -d appdb
+
+# Read-Only (Replicas)
+PGPASSWORD=<password> psql -h postgres-ro.production.svc.cluster.local -U postgres -d appdb
+```
+
+## Environment Variables
+
+Applications can connect to PostgreSQL using these environment variables:
+
+### Standalone Mode
+
+```yaml
+env:
+  - name: DATABASE_HOST
+    value: "postgres.development.svc.cluster.local"
+  - name: DATABASE_PORT
+    value: "5432"
+  - name: DATABASE_USER
+    valueFrom:
+      secretKeyRef:
+        name: postgres
+        key: postgres-user
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: postgres
+        key: postgres-password
+  - name: DATABASE_NAME
+    value: "appdb"
+```
+
+### CNPG Mode
+
+```yaml
+env:
+  - name: DATABASE_HOST
+    value: "postgres-rw.production.svc.cluster.local"  # Use -rw for writes
+  - name: DATABASE_HOST_RO
+    value: "postgres-ro.production.svc.cluster.local"  # Use -ro for reads
+  - name: DATABASE_PORT
+    value: "5432"
+  - name: DATABASE_USER
+    valueFrom:
+      secretKeyRef:
+        name: postgres-app
+        key: username
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: postgres-app
+        key: password
+  - name: DATABASE_NAME
+    value: "appdb"
 ```
 
 ## Production Considerations
 
-For production workloads:
+### High Availability (CNPG)
 
-1. **Use Managed Database Services**: RDS, Cloud SQL, or Azure Database for PostgreSQL
-2. **HA Configuration**: For self-hosted HA, use `bitnami/postgresql-ha` or CloudNativePG
-3. **Secrets Management**: Use External Secrets Operator or Sealed Secrets - never commit passwords
-4. **Backup**: Configure automated backups to S3/MinIO
-5. **Resource Sizing**: Increase resources based on workload
+1. **Minimum 3 Instances**: Ensures quorum for failover
+2. **Synchronous Replication**: Zero data loss with `synchronous.method: any`
+3. **Pod Anti-Affinity**: Spread instances across nodes
+4. **Separate WAL Storage**: Better I/O performance
+
+### Backup Strategy
+
+1. **Barman Integration**: Use CNPG's built-in Barman support
+2. **S3 Storage**: Store backups in object storage
+3. **Regular Testing**: Verify backup restoration regularly
+4. **Point-in-Time Recovery**: Enable WAL archiving for PITR
+
+### Security
+
+1. **Use Existing Secrets**: Never hardcode credentials
+2. **Network Policies**: Enable network isolation
+3. **TLS**: Configure TLS for production deployments
+4. **Limited Access**: Use dedicated users per application
+
+### Performance
+
+1. **Connection Pooling**: Use PgBouncer for connection pooling
+2. **Resource Planning**: Allocate sufficient CPU and memory
+3. **Storage Class**: Use fast storage (SSD) for production
+4. **Shared Buffers**: Configure based on available memory
 
 ## Upgrading
 
 ```bash
-helm upgrade postgres ./helm/charts/postgres -n <namespace>
+helm upgrade postgres ./helm/charts/postgres \
+  -f values-production.yaml \
+  -n production
 ```
 
 ## Uninstalling
 
 ```bash
-helm uninstall postgres -n <namespace>
+helm uninstall postgres -n development
 ```
 
-> **Note**: PVCs are not deleted by default. To delete them:
-> ```bash
-> kubectl delete pvc -l app.kubernetes.io/name=postgres -n <namespace>
-> ```
+> **Warning**: This will delete all data. Ensure you have backups.
 
 ## License
 
-Apache-2.0
+Apache 2.0

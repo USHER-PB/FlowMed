@@ -20,6 +20,12 @@ ingress-nginx:
     # Managed by the mode toggle below
     replicaCount: 1
     
+    # Use LoadBalancer service type with MetalLB
+    # MetalLB will assign an external IP from the configured pool
+    hostNetwork: false
+    hostPort:
+      enabled: false
+    
     # Image configuration
     image:
       registry: registry.k8s.io
@@ -43,9 +49,11 @@ ingress-nginx:
       maxReplicas: 10
       targetCPUUtilizationPercentage: 80
     
-    # Service configuration
+    # Service configuration - LoadBalancer type for external access
     service:
       type: LoadBalancer
+      internal:
+        enabled: true
       annotations: {}
     
     # Metrics configuration

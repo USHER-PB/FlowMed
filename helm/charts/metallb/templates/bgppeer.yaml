@@ -1,0 +1,50 @@
+{{- if and .Values.enabled (include "metallb.bgpPeerEnabled" .) }}
+{{- $fullname := include "metallb.fullname" . }}
+{{- $namespace := include "metallb.namespace" . }}
+{{- range .Values.bgp.peers }}
+{{- if .enabled }}
+---
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: {{ .name }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "metallb.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: bgp-peer
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+  {{- with $.Values.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  myASN: {{ $.Values.bgp.myASN }}
+  peerASN: {{ .asn }}
+  peerAddress: {{ .address }}
+  {{- if .port }}
+  peerPort: {{ .port }}
+  {{- end }}
+  {{- if .holdTime }}
+  holdTime: {{ .holdTime }}
+  {{- end }}
+  {{- if .keepaliveTime }}
+  keepaliveTime: {{ .keepaliveTime }}
+  {{- end }}
+  {{- if .routerID }}
+  routerID: {{ .routerID }}
+  {{- end }}
+  {{- if .password }}
+  password: {{ .password }}
+  {{- end }}
+  {{- if .communities }}
+  communities:
+    {{- toYaml .communities | nindent 4 }}
+  {{- end }}
+  {{- if .nodeSelectors }}
+  nodeSelectors:
+    {{- toYaml .nodeSelectors | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

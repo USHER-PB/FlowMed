@@ -1,8 +1,8 @@
 # =============================================================================
 # MinIO Helm Chart - Default Values
 # =============================================================================
-# S3-compatible object storage for local development and testing.
-# Supports standalone mode for local and external mode for cloud S3 services.
+# S3-compatible object storage for local development and production HA.
+# Supports standalone mode for local and distributed mode for HA production.
 # =============================================================================
 
 # =============================================================================
@@ -19,40 +19,16 @@ global:
 # =============================================================================
 # MinIO Deployment Control
 # =============================================================================
-# Enable MinIO deployment (set to false for external S3)
+# Enable MinIO deployment
 enabled: true
 
 # Deployment mode:
 # - "standalone": Single MinIO instance (local/dev)
 # - "distributed": Distributed High Availability mode (Production)
-# - "external": Use external S3 service (AWS S3, etc.)
 mode: standalone
 
-# Number of replicas (used when mode is standalone or distributed)
-# For distributed mode, this should be at least 4.
-replicaCount: 1
-
 # =============================================================================
-# External S3 Configuration (when mode: external)
-# =============================================================================
-external:
-  # S3 endpoint (e.g., s3.amazonaws.com)
-  endpoint: ""
-  # Region
-  region: ""
-  # Use SSL
-  ssl: true
-  # Existing secret containing credentials
-  existingSecret: ""
-  # Keys within the secret
-  secretKeys:
-    accessKey: access-key-id
-    secretKey: secret-access-key
-  # Default bucket to use
-  defaultBucket: ""
-
-# =============================================================================
-# Internal MinIO Configuration (when mode: standalone)
+# MinIO Image Configuration
 # =============================================================================
 image:
   repository: minio/minio
@@ -335,3 +311,64 @@ bucketInit:
 # =============================================================================
 commonLabels: {}
 commonAnnotations: {}
+
+# =============================================================================
+# Distributed Mode Configuration (when mode: distributed)
+# =============================================================================
+# MinIO distributed mode provides HA with erasure coding.
+# Minimum 4 nodes required for erasure coding (EC:2).
+# Recommended: 4, 6, 8, 10, 12, 14, or 16 nodes for optimal erasure coding.
+distributed:
+  # Number of MinIO nodes (must be even number, minimum 4)
+  # Each node runs in its own StatefulSet replica
+  replicas: 4
+  
+  # Erasure coding configuration
+  # MinIO automatically selects EC based on node count:
+  # - 4 nodes: EC:2 (can lose 2 drives)
+  # - 6 nodes: EC:2 (can lose 2 drives)
+  # - 8 nodes: EC:4 (can lose 4 drives)
+  # - 12 nodes: EC:4 (can lose 4 drives)
+  # - 16 nodes: EC:8 (can lose 8 drives)
+  
+  # Drives per node (for multi-drive setups)
+  # If > 1, each pod will mount multiple PVCs
+  drivesPerNode: 1
+  
+  # Storage configuration for distributed mode
+  # Each node gets its own PVC
+  storage:
+    size: 10Gi
+    storageClass: ""
+  
+  # Pod anti-affinity to spread across nodes
+  podAntiAffinity:
+    enabled: true
+    # Type: "required" (hard) or "preferred" (soft)
+    type: "preferred"
+    # Topology key
+    topologyKey: "kubernetes.io/hostname"
+    # Weight for preferred anti-affinity (1-100)
+    weight: 100
+  
+  # Resources for distributed mode (per pod)
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+  
+  # HPA for distributed mode
+  autoscaling:
+    enabled: false
+    minReplicas: 4
+    maxReplicas: 16
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  # PDB for distributed mode
+  pdb:
+    enabled: true
+    minAvailable: 2

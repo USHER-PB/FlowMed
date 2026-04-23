@@ -2,11 +2,11 @@ apiVersion: v2
 name: minio
 description: |
   MinIO Helm chart for the OM Platform.
-  S3-compatible object storage for local development and testing.
-  Supports standalone mode for local and external mode for cloud S3 services.
+  S3-compatible object storage for local development and production HA.
+  Supports standalone mode for local/dev and distributed mode for HA production.
 
 type: application
-version: 1.0.0
+version: 1.1.0
 appVersion: "RELEASE.2025-01-01"
 
 maintainers:
