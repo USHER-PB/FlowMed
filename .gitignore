@@ -46,3 +46,8 @@ prompts/
 *.swp
 *.swo
 TODO.md
+
+# Helm chart dependencies (fetched via helm dependency update)
+**/charts/charts/
+**/charts/*.tgz
+Chart.lock
