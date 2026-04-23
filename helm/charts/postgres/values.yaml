@@ -154,16 +154,21 @@ primary:
   # Pod labels
   podLabels: {}
   # Security context for pod
+  # NOTE: fsGroup may not work with some storage classes (e.g., Longhorn)
+  # Set fsGroupChangePolicy to "OnRootMismatch" for better compatibility
   podSecurityContext:
     fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
     seccompProfile:
       type: RuntimeDefault
   # Container security context
+  # NOTE: readOnlyRootFilesystem must be false for PostgreSQL to initialize data directory
+  # This is a known limitation - PostgreSQL needs to write to /var/lib/postgresql/data
   containerSecurityContext:
     runAsNonRoot: true
     runAsUser: 999
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
+    readOnlyRootFilesystem: false
     capabilities:
       drop:
         - ALL

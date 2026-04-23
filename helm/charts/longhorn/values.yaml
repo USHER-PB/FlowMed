@@ -1,0 +1,128 @@
+# =============================================================================
+# Longhorn Helm Chart - Default Values
+# =============================================================================
+# Cloud-native distributed block storage for Kubernetes.
+# Use for local development and on-prem deployments.
+# For cloud deployments (AKS, GKE, EKS), use provider's managed storage instead.
+# =============================================================================
+
+# =============================================================================
+# Longhorn Controller Configuration
+# =============================================================================
+longhorn:
+  # Enable Longhorn deployment
+  enabled: true
+
+  # =============================================================================
+  # Default Settings
+  # =============================================================================
+  defaultSettings:
+    # Backup target (S3/NFS) for backups
+    # Example: nfs://server:/path or s3://bucket@region/
+    backupTarget: ""
+    
+    # Number of replicas for volumes (1-10)
+    # Higher = more redundancy but more storage used
+    defaultReplicaCount: 2
+    
+    # Default data locality (disabled, best-effort, strict-local)
+    # strict-local ensures data is on the same node as the pod
+    defaultDataLocality: disabled
+    
+    # Storage over-provisioning percentage
+    storageOverProvisioningPercentage: 100
+    
+    # Storage minimal available percentage (warn when below)
+    storageMinimalAvailablePercentage: 10
+    
+    # Upgrade checker (disable for air-gapped environments)
+    upgradeChecker: false
+    
+    # Default longhorn static storage class name
+    defaultLonghornStaticStorageClass: longhorn
+
+  # =============================================================================
+  # Persistence Settings
+  # =============================================================================
+  persistence:
+    # Default storage class
+    defaultClass: true
+    # Filesystem type (ext4, xfs)
+    defaultFsType: ext4
+    # Default replica count for the default storage class
+    defaultClassReplicaCount: 2
+    # Default data locality
+    defaultDataLocality: disabled
+    # Reclaim policy (Retain, Delete)
+    reclaimPolicy: Delete
+    # Volume binding mode (Immediate, WaitForFirstConsumer)
+    volumeBindingMode: Immediate
+
+  # =============================================================================
+  # UI Configuration
+  # =============================================================================
+  ui:
+    # UI replicas
+    replicas: 1
+    # Service type (ClusterIP, NodePort, LoadBalancer)
+    service:
+      type: ClusterIP
+      # NodePort port (only when type is NodePort)
+      nodePort: ""
+
+  # =============================================================================
+  # Resource Management
+  # =============================================================================
+  longhornManager:
+    # Resource allocation
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  longhornDriver:
+    # Resource allocation
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # =============================================================================
+  # Tolerations for scheduling on all nodes
+  # =============================================================================
+  longhornManager:
+    tolerations: []
+    # - key: "node-role.kubernetes.io/control-plane"
+    #   operator: "Exists"
+    #   effect: "NoSchedule"
+
+  # =============================================================================
+  # Node Selector (deploy only on specific nodes)
+  # =============================================================================
+  nodeSelector: {}
+  # storage: "true"
+
+  # =============================================================================
+  # Ingress Configuration (for UI access)
+  # =============================================================================
+  ingress:
+    enabled: false
+    # Ingress class name
+    className: ""
+    # Host configuration
+    host: longhorn.local
+    # TLS configuration
+    tls: false
+    tlsSecret: ""
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+commonLabels: {}
+commonAnnotations: {}

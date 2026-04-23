@@ -19,7 +19,7 @@ global:
 postgres:
   # Enable PostgreSQL deployment
   enabled: true
-  
+  ls
   # Deployment mode: "standalone" or "external"
   mode: standalone
   
@@ -27,9 +27,13 @@ postgres:
   auth:
     database: appdb
     username: appuser
-    password: ""  # Auto-generated if empty
-    postgresPassword: ""  # Auto-generated if empty
-    existingSecret: ""
+    # Use existing secret for GitOps (sealed-secrets)
+    # Create sealed secret from configs/secrets-templates/data-store-postgres-sealed.yaml
+    existingSecret: "data-store-postgres"
+    # Password keys in the secret
+    secretKeys:
+      password: password
+      postgresPassword: postgres-password
   
   # Resource allocation
   resources:
@@ -45,6 +49,22 @@ postgres:
     enabled: true
     size: 5Gi
     storageClass: ""
+  
+  # Security context for Longhorn compatibility
+  primary:
+    podSecurityContext:
+      fsGroup: 999
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false  # Required for PostgreSQL data directory
+      capabilities:
+        drop:
+          - ALL
   
   # Network Policy
   networkPolicy:
@@ -64,8 +84,17 @@ minio:
   # Authentication
   auth:
     rootUser: minioadmin
-    rootPassword: ""  # Auto-generated if empty
-    existingSecret: ""
+    # Use existing secret for GitOps (sealed-secrets)
+    # Create sealed secret from configs/secrets-templates/data-store-minio-sealed.yaml
+    existingSecret: "data-store-minio"
+    # Password key in the secret
+    secretKeys:
+      rootPassword: root-password
+  
+  # Disable init container for Longhorn compatibility
+  # Longhorn doesn't support chown in init containers
+  initContainer:
+    enabled: false
   
   # Buckets to create
   buckets:
@@ -86,8 +115,26 @@ minio:
   # Persistence
   persistence:
     enabled: true
-    size: 10Gi
+    # Size reduced to 4Gi for local development with limited storage
+    # Longhorn creates 2 replicas by default, so 4Gi × 2 = 8Gi total
+    size: 4Gi
     storageClass: ""
+  
+  # Security context for Longhorn compatibility
+  pod:
+    securityContext:
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false  # Required for MinIO data directory
+      capabilities:
+        drop:
+          - ALL
   
   # Console
   console:

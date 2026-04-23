@@ -39,7 +39,7 @@ sealed-secrets:
   image:
     registry: docker.io
     repository: bitnami/sealed-secrets-controller
-    tag: v0.26.0
+    tag: 0.27.0
     pullPolicy: IfNotPresent
   
   # Resource allocation

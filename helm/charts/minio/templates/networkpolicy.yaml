@@ -14,6 +14,7 @@ spec:
   podSelector:
     matchLabels:
       {{- include "minio.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
   policyTypes:
     - Ingress
     - Egress

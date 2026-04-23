@@ -3,7 +3,7 @@ name: sealed-secrets
 description: Sealed Secrets controller for GitOps-friendly secrets management
 type: application
 version: 1.0.0
-appVersion: "0.26.0"
+appVersion: "0.27.0"
 keywords:
   - sealed-secrets
   - secrets
@@ -20,6 +20,6 @@ annotations:
   artifacthub.io/license: Apache-2.0
 dependencies:
   - name: sealed-secrets
-    version: "2.16.0"
+    version: "2.17.0"
     repository: "https://bitnami-labs.github.io/sealed-secrets"
     condition: sealed-secrets.enabled

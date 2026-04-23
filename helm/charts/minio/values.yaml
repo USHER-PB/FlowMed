@@ -56,17 +56,22 @@ external:
 # =============================================================================
 image:
   repository: minio/minio
-  tag: "RELEASE.2025-01-01T00-00-00Z"
+  # Use -cpuv1 suffix for compatibility with older CPUs (x86-64-v1)
+  # Standard images require x86-64-v2 (SSE4.2, POPCNT) not available on older hardware
+  tag: "RELEASE.2025-09-07T16-13-09Z-cpuv1"
   pullPolicy: IfNotPresent
 
 # mc image for bucket initialization
+# Use -cpuv1 suffix for compatibility with older CPUs (x86-64-v1)
 mcImage:
   repository: minio/mc
-  tag: "RELEASE.2025-01-01T00-00-00Z"
+  tag: "RELEASE.2025-08-13T08-35-41Z-cpuv1"
   pullPolicy: IfNotPresent
 
-# Init container image for permissions fix
+# Init container for permissions fix
+# NOTE: Disable for Longhorn and other storage classes that don't support chown
 initContainer:
+  enabled: false
   image:
     repository: busybox
     tag: "1.36"
@@ -132,8 +137,9 @@ persistence:
   # Access modes
   accessModes:
     - ReadWriteOnce
-  # Storage size
-  size: 10Gi
+  # Storage size (4Gi for local development with limited storage)
+  # Longhorn creates 2 replicas by default, so 4Gi × 2 = 8Gi total
+  size: 4Gi
   # Existing PVC to use (disables dynamic provisioning)
   existingClaim: ""
   # Annotations for PVC
@@ -194,16 +200,21 @@ pod:
   # Pod labels
   labels: {}
   # Security context for pod
+  # NOTE: fsGroup may not work with some storage classes (e.g., Longhorn)
+  # Set fsGroupChangePolicy to "OnRootMismatch" for better compatibility
   securityContext:
     fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
     seccompProfile:
       type: RuntimeDefault
   # Container security context
+  # NOTE: readOnlyRootFilesystem must be false for MinIO to write data
+  # This is a known limitation - MinIO needs to write to /data
   containerSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
+    readOnlyRootFilesystem: false
     capabilities:
       drop:
         - ALL

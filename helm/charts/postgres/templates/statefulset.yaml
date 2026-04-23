@@ -60,6 +60,10 @@ spec:
                   key: password
             - name: POSTGRES_DB
               value: {{ .Values.auth.database | quote }}
+            # PGDATA subdirectory is required for Longhorn and other storage classes
+            # that don't support chmod on the volume root
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
             {{- if .Values.auth.postgresPassword }}
             - name: POSTGRES_POSTGRES_PASSWORD
               valueFrom:
@@ -122,7 +126,6 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
-              subPath: pgdata
             {{- if or .Values.initScripts .Values.initScriptsConfigMap }}
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d

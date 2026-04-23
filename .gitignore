@@ -46,3 +46,13 @@ prompts/
 *.swp
 *.swo
 TODO.md
+
+# Helm build artifacts
+**/charts/*.tgz
+**/Chart.lock
+!helm/charts/*/Chart.yaml
+!helm/charts/*/charts/.keep
+
+# Binary tools
+kubeseal*
+*.tar.gz
