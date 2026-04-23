@@ -144,6 +144,74 @@ The UI applications communicate with the Fineract Core API (Wave 4) through the 
 - **Wave 1**: Keycloak must be configured with appropriate clients
 - **Wave 0**: PostgreSQL (indirect dependency via Fineract Core)
 
+## Secrets Management
+
+The UI stack relies on secrets created by the Fineract Core (Wave 4) deployment. No additional secrets are required for the UI applications.
+
+### Keycloak Client Secrets
+
+Each UI application requires a Keycloak client to be configured. The clients are referenced by their `clientId` in the values.yaml:
+
+| Application | Default Client ID | Description |
+|-------------|-------------------|-------------|
+| Portal | `fineract-portal` | Main dashboard client |
+| Web App | `fineract-web-app` | Banking operations client |
+| Admin | `fineract-admin` | Administrative client |
+| Self-Service | `fineract-self-service` | Customer portal client |
+| Account Management | `fineract-account-management` | Account operations client |
+| Accounting | `fineract-accounting` | Financial accounting client |
+| Reporting | `fineract-reporting` | Reports and analytics client |
+| Branch | `fineract-branch` | Branch operations client |
+| Cashier | `fineract-cashier` | Teller operations client |
+| Asset | `fineract-asset` | Asset management client |
+
+### Creating Keycloak Clients
+
+Keycloak clients should be created in the `fineract` realm with the following settings:
+
+1. **Create client** in Keycloak admin console:
+   - Client ID: `fineract-portal` (or appropriate app client)
+   - Client Protocol: `openid-connect`
+   - Access Type: `public`
+   - Valid Redirect URIs: `https://<app-hostname>/*`
+   - Web Origins: `https://<app-hostname>`
+
+2. **Example using kubectl and Keycloak REST API**:
+```bash
+# Get Keycloak admin token
+TOKEN=$(curl -s https://keycloak.example.com/realms/master/protocol/openid-connect/token \
+  -d "username=admin" \
+  -d "password=admin" \
+  -d "grant_type=password" \
+  -d "client_id=admin-cli" | jq -r .access_token)
+
+# Create client for Portal UI
+curl -X POST https://keycloak.example.com/admin/realms/fineract/clients \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "fineract-portal",
+    "publicClient": true,
+    "redirectUris": ["https://portal.fineract.example.com/*"],
+    "webOrigins": ["https://portal.fineract.example.com"],
+    "standardFlowEnabled": true
+  }'
+```
+
+### SealedSecrets for Keycloak (Optional)
+
+If using SealedSecrets for Keycloak client secrets (for confidential clients):
+
+```bash
+# Create sealed secret for a confidential client
+kubectl create secret generic fineract-portal-client-secret \
+  --from-literal=clientSecret='your-client-secret' \
+  --namespace fineract \
+  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret-portal-client.yaml
+
+kubectl apply -f sealed-secret-portal-client.yaml
+```
+
 ## Troubleshooting
 
 ### Application Not Accessible
@@ -163,3 +231,19 @@ The UI applications communicate with the Fineract Core API (Wave 4) through the 
 1. Verify Keycloak is accessible from the UI
 2. Check Keycloak client configuration
 3. Verify redirect URIs match the application hostname
+
+### Verifying Deployment
+
+```bash
+# Check all UI pods are running
+kubectl get pods -n fineract -l app.kubernetes.io/part-of=fineract-ui-stack
+
+# Check all ingress resources
+kubectl get ingress -n fineract
+
+# Verify ConfigMaps for each app
+kubectl get configmap -n fineract
+
+# Check TLS certificates
+kubectl get certificate -n fineract
+```
