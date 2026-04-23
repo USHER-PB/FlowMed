@@ -1,0 +1,92 @@
+# infra-cache Umbrella Chart Values
+#
+# This chart uses official upstream charts for high-availability caching.
+# For production, we recommend using SealedSecrets by uncommenting the `existingSecret` lines.
+
+# ==============================================================================
+# Bitnami Redis (HA with Sentinel)
+# ==============================================================================
+redis:
+  # Deploy Redis in High Availability (Sentinel) mode
+  architecture: replication
+  sentinel:
+    enabled: true
+    # Configures the master group name for sentinel
+    masterSet: "fineract-master"
+
+
+  auth:
+    enabled: true
+    # Global password for dev/local use. Helm generates the secret using this.
+    password: "redis_dev_password"
+    
+    # --------------------------------------------------------------------------
+    # PRODUCTION SECURITY (SealedSecrets):
+    # Uncomment these lines in production to use a pre-created SealedSecret
+    # --------------------------------------------------------------------------
+    # existingSecret: "infra-cache-redis-auth"
+    # existingSecretPasswordKey: "redis-password"
+
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: longhorn
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "250m"
+
+  # Replica (and implicitly Sentinel) persistence and resources
+  # 1 Master + 2 Replicas = 3 nodes total for quorum
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: longhorn
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "250m"
+
+  # Disable Bitnami's built-in metrics in favor of the standalone prometheus-community exporter below
+  metrics:
+    enabled: false
+
+
+# ==============================================================================
+# Prometheus Redis Exporter
+# ==============================================================================
+prometheus-redis-exporter:
+  enabled: true
+  
+  # Point the exporter to the Redis Master service created by the Bitnami chart.
+  # The service name defaults to `<release-name>-redis-master`.
+  redisAddress: "redis://infra-cache-redis-master:6379"
+
+  # Pass the authentication password to the exporter. 
+  # Note: If you use SealedSecrets above, you should also pass the secret here using `envFromSecret`.
+  env:
+    - name: REDIS_PASSWORD
+      value: "redis_dev_password"
+
+  serviceMonitor:
+    enabled: true
+    labels:
+      # These labels help Prometheus Operator automatically discover this monitor
+      release: prometheus # Typical label for kube-prometheus-stack
+  
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "25m"
+    limits:
+      memory: "64Mi"
+      cpu: "100m"

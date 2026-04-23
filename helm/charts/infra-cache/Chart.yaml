@@ -1,0 +1,14 @@
+apiVersion: v2
+name: infra-cache
+description: Caching layer using Redis HA (Sentinel) & Redis Exporter
+type: application
+version: 0.1.0
+appVersion: "7.4"
+
+dependencies:
+  - name: redis
+    version: ^25.0.0
+    repository: https://charts.bitnami.com/bitnami
+  - name: prometheus-redis-exporter
+    version: 6.21.0
+    repository: https://prometheus-community.github.io/helm-charts
