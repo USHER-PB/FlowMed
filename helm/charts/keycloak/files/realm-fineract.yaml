@@ -597,12 +597,12 @@ clients:
       {{- end }}
     fullScopeAllowed: true
     defaultClientScopes:
-      - basic
+
       - profile
       - email
       - roles
       - web-origins
-      - acr
+
     attributes:
       post.logout.redirect.uris: "{{- if eq (.Values.keycloakConfig.environment | default "dev") "dev" }}http://localhost:3000/*##http://localhost:8080/kyc-manager/*{{- end }}{{- if .Values.keycloak.externalKycUrl }}{{- if eq (.Values.keycloakConfig.environment | default "dev") "dev" }}##{{- end }}{{ .Values.keycloak.externalKycUrl }}/*{{- end }}{{- if .Values.keycloak.externalAppUrl }}##{{ .Values.keycloak.externalAppUrl }}/kyc-manager/*{{- end }}"
     protocolMappers:
@@ -697,12 +697,12 @@ clients:
     serviceAccountsEnabled: false
     fullScopeAllowed: true
     defaultClientScopes:
-      - basic
+
       - profile
       - email
       - roles
       - web-origins
-      - acr
+
     protocolMappers:
       - name: fineract-client-id-mapper
         protocol: openid-connect
@@ -789,12 +789,12 @@ clients:
       - "http://localhost:8081"
       {{- end }}
     defaultClientScopes:
-      - basic
+
       - profile
       - email
       - roles
       - web-origins
-      - acr
+
 
   # 12. Resource Server Client (user-storage backend — server-to-server auth)
   - clientId: "resource-server"
@@ -811,7 +811,7 @@ clients:
     standardFlowEnabled: false
     redirectUris: []
     defaultClientScopes:
-      - basic
+
       - profile
       - email
       - roles

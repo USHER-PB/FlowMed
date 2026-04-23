@@ -15,7 +15,8 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     {{- end }}
     # Rate limit login endpoints to prevent brute force
-    nginx.ingress.kubernetes.io/limit-rps: "10"
+    # Note: Admin console loads many JS files in parallel, so limit should be higher
+    nginx.ingress.kubernetes.io/limit-rps: "50"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"

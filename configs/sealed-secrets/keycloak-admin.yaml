@@ -14,4 +14,9 @@ spec:
       creationTimestamp: null
       name: keycloak-keycloak
       namespace: fineract
+      labels:
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        meta.helm.sh/release-name: keycloak
+        meta.helm.sh/release-namespace: fineract
     type: Opaque

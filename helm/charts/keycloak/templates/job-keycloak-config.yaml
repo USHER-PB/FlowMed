@@ -56,6 +56,8 @@ spec:
             - |
               ATTEMPT=0
               MAX=60
+              {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+              # Keycloak 22+ has health endpoint on management port 9000
               until [ $ATTEMPT -ge $MAX ]; do
                 ATTEMPT=$((ATTEMPT + 1))
                 if wget -q --spider http://keycloak:9000/health/ready 2>/dev/null; then
@@ -65,6 +67,18 @@ spec:
                 [ $((ATTEMPT % 12)) -eq 0 ] && echo "Still waiting for Keycloak... ${ATTEMPT}/${MAX}"
                 sleep 5
               done
+              {{- else }}
+              # Keycloak <22 uses HTTP port 8080 for health check
+              until [ $ATTEMPT -ge $MAX ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+                if wget -q --spider http://keycloak:8080/ 2>/dev/null; then
+                  echo "Keycloak is ready (attempt $ATTEMPT)"
+                  exit 0
+                fi
+                [ $((ATTEMPT % 12)) -eq 0 ] && echo "Still waiting for Keycloak... ${ATTEMPT}/${MAX}"
+                sleep 5
+              done
+              {{- end }}
               echo "ERROR: Keycloak not ready after $((MAX * 5))s"
               exit 1
           resources:
