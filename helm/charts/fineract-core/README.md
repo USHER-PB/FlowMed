@@ -177,7 +177,87 @@ secrets:
     password: "your-api-password"
 ```
 
-### Option 2: External Secrets Operator (Recommended for Production)
+### Option 2: Sealed Secrets (Recommended for Production)
+
+This chart uses SealedSecrets for secure secret management in GitOps workflows. The chart references SealedSecret resources that must be created before deployment.
+
+#### Required SealedSecrets
+
+| Secret Name | Keys | Used By |
+|-------------|------|---------|
+| `fineract-db-secret` | `password` | Fineract instances |
+| `fineract-keycloak-sealed` | `clientId`, `clientSecret` | User Sync, OAuth2 Proxy |
+| `fineract-oauth2-proxy-sealed` | `clientId`, `clientSecret`, `cookieSecret` | OAuth2 Proxy |
+| `fineract-api-sealed` | `username`, `password` | User Sync, Config CLI |
+
+#### Creating SealedSecrets
+
+1. **Install kubeseal** (if not already installed):
+```bash
+# macOS
+brew install kubeseal
+
+# Linux
+wget https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/kubeseal-0.24.0-linux-amd64.tar.gz
+tar -xzf kubeseal-0.24.0-linux-amd64.tar.gz
+sudo install -m 755 kubeseal /usr/local/bin/kubeseal
+```
+
+2. **Create a database secret**:
+```bash
+kubectl create secret generic fineract-db-secret \
+  --from-literal=password='your-secure-db-password' \
+  --namespace fineract \
+  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret-db.yaml
+```
+
+3. **Create Keycloak client secret**:
+```bash
+kubectl create secret generic fineract-keycloak-sealed \
+  --from-literal=clientId='fineract-api' \
+  --from-literal=clientSecret='your-keycloak-client-secret' \
+  --namespace fineract \
+  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret-keycloak.yaml
+```
+
+4. **Create OAuth2 Proxy secret**:
+```bash
+# Generate cookie secret
+COOKIE_SECRET=$(openssl rand -base64 32 | tr -d '\n')
+
+kubectl create secret generic fineract-oauth2-proxy-sealed \
+  --from-literal=clientId='fineract-api' \
+  --from-literal=clientSecret='your-oauth2-client-secret' \
+  --from-literal=cookieSecret="$COOKIE_SECRET" \
+  --namespace fineract \
+  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret-oauth2.yaml
+```
+
+5. **Create Fineract API credentials secret**:
+```bash
+kubectl create secret generic fineract-api-sealed \
+  --from-literal=username='admin' \
+  --from-literal=password='your-fineract-api-password' \
+  --namespace fineract \
+  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret-api.yaml
+```
+
+6. **Apply SealedSecrets to cluster**:
+```bash
+kubectl apply -f sealed-secret-db.yaml
+kubectl apply -f sealed-secret-keycloak.yaml
+kubectl apply -f sealed-secret-oauth2.yaml
+kubectl apply -f sealed-secret-api.yaml
+```
+
+7. **Commit SealedSecrets to Git** (safe to store in version control):
+```bash
+git add sealed-secret-*.yaml
+git commit -m "Add sealed secrets for fineract-core"
+git push
+```
+
+### Option 3: External Secrets Operator (Alternative for Production)
 
 ```yaml
 serviceAccount:
@@ -185,6 +265,19 @@ serviceAccount:
     eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/fineract-role
 
 # Create ExternalSecret resources separately
+```
+
+### Verifying Secrets
+
+```bash
+# List secrets in namespace
+kubectl get secrets -n fineract
+
+# Verify sealed secrets are unsealed
+kubectl get sealedsecrets -n fineract
+
+# Check secret contents (base64 decoded)
+kubectl get secret fineract-db-secret -n fineract -o jsonpath='{.data.password}' | base64 -d
 ```
 
 ## Resource Requirements
