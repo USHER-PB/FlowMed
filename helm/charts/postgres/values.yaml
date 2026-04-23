@@ -465,6 +465,28 @@ cnpg:
   # Tablespaces configuration
   tablespaces: []
   
+  # Managed roles (CNPG declarative user management)
+  # See: https://cloudnative-pg.io/documentation/current/managed_roles/
+  managedRoles: []
+    # - name: keycloak
+    #   ensure: present
+    #   login: true
+    #   createdb: true
+    #   passwordSecret: keycloak-db-credentials
+    # - name: user_storage
+    #   ensure: present
+    #   login: true
+    #   createdb: true
+    #   passwordSecret: user-storage-db-credentials
+  
+  # Secrets for managed roles (auto-generated if password provided)
+  # For production, use SealedSecrets or External Secrets Operator
+  managedRoleSecrets: []
+    # - name: keycloak-db-credentials
+    #   password: ""  # Leave empty for auto-generation
+    # - name: user-storage-db-credentials
+    #   password: ""
+  
   # Inheritance (for replica clusters)
   inheritance: {}
   

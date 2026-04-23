@@ -250,6 +250,48 @@ spec:
   {{- end }}
   
   {{- /*
+  Managed roles configuration
+  */}}
+  {{- if .Values.cnpg.managedRoles }}
+  managed:
+    roles:
+      {{- range .Values.cnpg.managedRoles }}
+      - name: {{ .name }}
+        ensure: {{ .ensure | default "present" }}
+        login: {{ .login | default true }}
+        {{- if .superuser }}
+        superuser: {{ .superuser }}
+        {{- end }}
+        {{- if .createdb }}
+        createdb: {{ .createdb }}
+        {{- end }}
+        {{- if .createrole }}
+        createrole: {{ .createrole }}
+        {{- end }}
+        {{- if .inherit }}
+        inherit: {{ .inherit }}
+        {{- end }}
+        {{- if .connectionLimit }}
+        connectionLimit: {{ .connectionLimit }}
+        {{- end }}
+        {{- if .passwordSecret }}
+        passwordSecret:
+          name: {{ .passwordSecret }}
+        {{- end }}
+        {{- if .passwordType }}
+        passwordType: {{ .passwordType }}
+        {{- end }}
+        {{- with .inRoles }}
+        inRoles:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .validUntil }}
+        validUntil: {{ . }}
+        {{- end }}
+      {{- end }}
+  {{- end }}
+  
+  {{- /*
   Service account configuration
   */}}
   serviceAccountTemplate:
