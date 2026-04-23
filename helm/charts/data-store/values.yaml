@@ -39,17 +39,17 @@ postgres:
   # Resource allocation
   resources:
     requests:
-      memory: 256Mi
-      cpu: 100m
-    limits:
       memory: 512Mi
-      cpu: 500m
+      cpu: 200m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
   
   # Persistence
   persistence:
     enabled: true
-    # Reduced size for 2-node cluster with limited storage
-    size: 2Gi
+    # Storage size for PostgreSQL data
+    size: 5Gi
     storageClass: ""
   
   # Security context for Longhorn compatibility (standalone mode only)
@@ -83,12 +83,12 @@ postgres:
       sharedBuffers: "256MB"
       effectiveCacheSize: "768MB"
       maxConnections: "200"
-      maxWalSize: "256MB"  # Must be smaller than walStorage.size (512Mi)
-      minWalSize: "64MB"
+      maxWalSize: "1GB"  # Must be smaller than walStorage.size
+      minWalSize: "128MB"
     walStorage:
       enabled: true
-      # Reduced size for 2-node cluster with limited storage
-      size: "512Mi"
+      # WAL storage for write-ahead logs
+      size: "2Gi"
     storage:
       resizeInUseVolumes: true
     affinity:
