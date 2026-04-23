@@ -1,0 +1,41 @@
+{{/*
+=============================================================================
+NGINX Gateway Ingress
+=============================================================================
+Validates: Requirements 1.4, 4.1, 4.4, 4.5
+=============================================================================
+*/}}
+{{- if and .Values.gateway.enabled .Values.gateway.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-gateway
+  labels:
+    {{- include "fineract-core.gateway.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.gateway.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with (include "fineract-core.annotations" .) }}
+    {{- . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.gateway.ingress.className }}
+  {{- if .Values.gateway.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.gateway.ingress.hostname }}
+      secretName: {{ .Values.gateway.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.gateway.ingress.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-core.fullname" . }}-gateway
+                port:
+                  number: 80
+{{- end }}

@@ -1,0 +1,83 @@
+{{/*
+=============================================================================
+Config CLI Bootstrap Job
+=============================================================================
+Validates: Requirements 1.6, 6.1, 6.2, 6.3, 6.5, 6.6, 12.6
+=============================================================================
+*/}}
+{{- if .Values.configCli.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-config-cli
+  labels:
+    {{- include "fineract-core.configCli.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.configCli.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: config-cli
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "fineract-core.configCliImage" . }}
+          imagePullPolicy: {{ .Values.configCli.image.pullPolicy }}
+          env:
+            # Fineract API connection
+            - name: FINERACT_API_URL
+              value: "http://{{ include "fineract-core.fullname" . }}-write:8080"
+            - name: FINERACT_API_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: username
+            - name: FINERACT_API_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: password
+            # Config data path
+            - name: CONFIG_DATA_PATH
+              value: "/config/bootstrap.json"
+          volumeMounts:
+            - name: config-data
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests:
+              cpu: {{ .Values.configCli.resources.requests.cpu }}
+              memory: {{ .Values.configCli.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.configCli.resources.limits.cpu }}
+              memory: {{ .Values.configCli.resources.limits.memory }}
+      volumes:
+        - name: config-data
+          configMap:
+            name: {{ include "fineract-core.fullname" . }}-config-cli
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

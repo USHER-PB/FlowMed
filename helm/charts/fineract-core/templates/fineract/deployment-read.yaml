@@ -1,0 +1,120 @@
+{{/*
+=============================================================================
+Fineract Read Instance Deployment
+=============================================================================
+Validates: Requirements 1.2, 2.1, 2.4, 2.5, 2.6, 2.7, 12.1, 12.2, 13.1, 13.2, 1.7
+=============================================================================
+*/}}
+{{- if .Values.fineract.read.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-read
+  labels:
+    {{- include "fineract-core.read.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.fineract.read.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fineract-core.read.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.read.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: fineract-read
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "fineract-core.fineractImage" . }}
+          imagePullPolicy: {{ .Values.fineract.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # Fineract instance mode
+            - name: FINERACT_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: FINERACT_MODE_READ_ENABLED
+              value: "true"
+            # PostgreSQL connection
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.database.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: password
+            # Connection pool settings
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              value: {{ .Values.database.connectionPool.maxPoolSize | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              value: {{ .Values.database.connectionPool.minIdle | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+              value: {{ .Values.database.connectionPool.connectionTimeout | quote }}
+            # Redis connection
+            - name: SPRING_REDIS_HOST
+              value: {{ .Values.redis.host | quote }}
+            - name: SPRING_REDIS_PORT
+              value: {{ .Values.redis.port | quote }}
+            - name: SPRING_REDIS_DATABASE
+              value: {{ .Values.redis.database | quote }}
+          livenessProbe:
+            httpGet:
+              path: /fineract-provider/actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /fineract-provider/actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /fineract-provider/actuator/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: {{ .Values.fineract.read.resources.requests.cpu }}
+              memory: {{ .Values.fineract.read.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.fineract.read.resources.limits.cpu }}
+              memory: {{ .Values.fineract.read.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

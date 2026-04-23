@@ -1,0 +1,113 @@
+{{/*
+=============================================================================
+User Sync Service Deployment
+=============================================================================
+Validates: Requirements 1.3, 3.1, 3.2, 3.3, 3.4, 3.5, 12.3, 13.3, 1.7, 14.2, 14.4
+=============================================================================
+*/}}
+{{- if .Values.userSync.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-user-sync
+  labels:
+    {{- include "fineract-core.userSync.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.userSync.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fineract-core.userSync.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.userSync.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: user-sync
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "fineract-core.userSyncImage" . }}
+          imagePullPolicy: {{ .Values.userSync.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            # Keycloak connection
+            - name: KEYCLOAK_URL
+              value: {{ .Values.userSync.keycloak.url | quote }}
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.userSync.keycloak.realm | quote }}
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.keycloak.secretName }}
+                  key: clientId
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.keycloak.secretName }}
+                  key: clientSecret
+            # Fineract API connection
+            - name: FINERACT_API_URL
+              value: "http://{{ include "fineract-core.fullname" . }}-write:8080"
+            - name: FINERACT_API_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: username
+            - name: FINERACT_API_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: password
+            # Sync configuration
+            - name: SYNC_INTERVAL_SECONDS
+              value: {{ .Values.userSync.syncIntervalSeconds | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.userSync.resources.requests.cpu }}
+              memory: {{ .Values.userSync.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.userSync.resources.limits.cpu }}
+              memory: {{ .Values.userSync.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
