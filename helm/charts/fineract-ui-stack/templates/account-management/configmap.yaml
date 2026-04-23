@@ -1,0 +1,27 @@
+{{/*
+=============================================================================
+Account Management ConfigMap Template
+=============================================================================
+ConfigMap containing config.json for Account Management UI application
+Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
+=============================================================================
+*/}}
+{{- if .Values.accountManagement.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-account-management-config
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "account-management") | nindent 4 }}
+data:
+  config.json: |
+    {
+      "apiEndpoint": "{{ .Values.global.apiEndpoint }}",
+      "keycloak": {
+        "url": "{{ .Values.global.keycloak.url }}",
+        "realm": "{{ .Values.global.keycloak.realm }}",
+        "clientId": "{{ .Values.accountManagement.keycloak.clientId }}",
+        "redirectUri": "https://{{ .Values.accountManagement.hostname }}"
+      }
+    }
+{{- end }}

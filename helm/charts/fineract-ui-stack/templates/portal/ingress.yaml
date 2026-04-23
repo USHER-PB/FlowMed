@@ -1,0 +1,36 @@
+{{/*
+=============================================================================
+Portal Ingress Template
+=============================================================================
+Ingress for Portal UI application with TLS and cert-manager
+Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+=============================================================================
+*/}}
+{{- if and .Values.portal.enabled .Values.portal.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-portal
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "portal") | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.portal.ingress.clusterIssuer | default "letsencrypt-prod" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.portal.hostname }}
+      secretName: {{ .Values.portal.tls.secretName }}
+  rules:
+    - host: {{ .Values.portal.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-portal
+                port:
+                  number: 80
+{{- end }}

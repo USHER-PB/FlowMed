@@ -1,0 +1,66 @@
+{{/*
+=============================================================================
+Cashier Deployment Template
+=============================================================================
+Deployment for Cashier UI application (NGINX serving static files)
+Requirements: 7.2, 7.5, 8.5, 12.6, 13.6
+=============================================================================
+*/}}
+{{- if .Values.cashier.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-cashier
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "cashier") | nindent 4 }}
+spec:
+  replicas: {{ .Values.cashier.replicaCount | default .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "cashier") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "cashier") | nindent 8 }}
+    spec:
+      containers:
+        - name: cashier
+          image: "{{ .Values.cashier.image.repository }}:{{ .Values.cashier.image.tag | default .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.cashier.image.pullPolicy | default .Values.ui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.cashier.resources.requests.cpu | default .Values.ui.resources.requests.cpu }}
+              memory: {{ .Values.cashier.resources.requests.memory | default .Values.ui.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.cashier.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
+              memory: {{ .Values.cashier.resources.limits.memory | default .Values.ui.resources.limits.memory }}
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/assets/config.json
+              subPath: config.json
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "fineract-ui-stack.fullname" . }}-cashier-config
+{{- end }}

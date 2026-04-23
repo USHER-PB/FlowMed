@@ -1,0 +1,66 @@
+{{/*
+=============================================================================
+Account Management Deployment Template
+=============================================================================
+Deployment for Account Management UI application (NGINX serving static files)
+Requirements: 7.2, 7.5, 8.5, 12.6, 13.6
+=============================================================================
+*/}}
+{{- if .Values.accountManagement.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-account-management
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "account-management") | nindent 4 }}
+spec:
+  replicas: {{ .Values.accountManagement.replicaCount | default .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "account-management") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "account-management") | nindent 8 }}
+    spec:
+      containers:
+        - name: account-management
+          image: "{{ .Values.accountManagement.image.repository }}:{{ .Values.accountManagement.image.tag | default .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.accountManagement.image.pullPolicy | default .Values.ui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.accountManagement.resources.requests.cpu | default .Values.ui.resources.requests.cpu }}
+              memory: {{ .Values.accountManagement.resources.requests.memory | default .Values.ui.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.accountManagement.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
+              memory: {{ .Values.accountManagement.resources.limits.memory | default .Values.ui.resources.limits.memory }}
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/assets/config.json
+              subPath: config.json
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "fineract-ui-stack.fullname" . }}-account-management-config
+{{- end }}

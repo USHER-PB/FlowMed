@@ -1,0 +1,36 @@
+{{/*
+ =============================================================================
+ Asset Ingress Template
+ =============================================================================
+ Ingress for Asset UI application with TLS and cert-manager
+ Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+ =============================================================================
+ */}}
+{{- if and .Values.asset.enabled .Values.asset.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-asset
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "asset") | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.asset.ingress.clusterIssuer | default "letsencrypt-prod" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.asset.hostname }}
+      secretName: {{ .Values.asset.tls.secretName }}
+  rules:
+    - host: {{ .Values.asset.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-asset
+                port:
+                  number: 80
+{{- end }}

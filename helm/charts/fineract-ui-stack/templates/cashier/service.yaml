@@ -1,0 +1,25 @@
+{{/*
+=============================================================================
+Cashier Service Template
+=============================================================================
+ClusterIP service for Cashier UI application
+Requirements: 7.3
+=============================================================================
+*/}}
+{{- if .Values.cashier.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-cashier
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "cashier") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "cashier") | nindent 4 }}
+{{- end }}
