@@ -1,0 +1,6 @@
+apiVersion: v2
+name: azamra-ui
+description: Azamra Mobile Web App (PWA) — customer-facing interface for transfers, KYC status tracking, and the asset marketplace
+type: application
+version: 0.1.0
+appVersion: "latest"

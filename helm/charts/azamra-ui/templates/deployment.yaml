@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azamra-frontend-mobile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-frontend-mobile
+    {{- include "azamra-ui.labels" . | nindent 4 }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "8"
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: azamra-frontend-mobile
+  template:
+    metadata:
+      labels:
+        app: azamra-frontend-mobile
+        {{- include "azamra-ui.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "azamra-ui.imagePullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: false  # nginx needs root to bind port 80 — PWA image runs as nginx
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: azamra-frontend-mobile
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["CHOWN", "SETGID", "SETUID"]
+          ports:
+            - containerPort: {{ .Values.port }}
+              name: http
+          env:
+            - name: TZ
+              value: "Europe/Berlin"
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: config
+          configMap:
+            name: azamra-ui-config
