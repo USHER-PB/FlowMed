@@ -74,7 +74,17 @@ longhorn:
   # Resource Management
   # =============================================================================
   longhornManager:
-    # Resource allocation
+    # Resource allocation - increased for stability
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  longhornDriver:
+    # Resource allocation - increased for stability
     resources:
       requests:
         cpu: 100m
@@ -83,14 +93,23 @@ longhorn:
         cpu: 500m
         memory: 512Mi
 
-  longhornDriver:
-    # Resource allocation
+  # Webhook configuration for stability
+  conversionWebhook:
     resources:
       requests:
-        cpu: 50m
+        cpu: 100m
         memory: 128Mi
       limits:
-        cpu: 200m
+        cpu: 500m
+        memory: 256Mi
+
+  admissionWebhook:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
         memory: 256Mi
 
   # =============================================================================

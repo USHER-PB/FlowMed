@@ -1,7 +1,7 @@
 {{- if .Values.enabled }}
 MetalLB has been deployed to your cluster.
 
-{{- if (include "metallb.ipPoolEnabled" .) }}
+{{- if eq (include "metallb.ipPoolEnabled" .) "true" }}
 
 IP Address Pools configured:
 {{- range $name, $pool := .Values.ipAddressPools }}
@@ -12,14 +12,14 @@ IP Address Pools configured:
 
 {{- end }}
 
-{{- if (include "metallb.l2AdvertisementEnabled" .) }}
+{{- if eq (include "metallb.l2AdvertisementEnabled" .) "true" }}
 
 L2 Advertisement enabled (ARP/NDP mode)
 Services will be announced via ARP/NDP on your network.
 
 {{- end }}
 
-{{- if (include "metallb.bgpEnabled" .) }}
+{{- if eq (include "metallb.bgpEnabled" .) "true" }}
 
 BGP Advertisement enabled
 Services will be announced via BGP to configured peers.

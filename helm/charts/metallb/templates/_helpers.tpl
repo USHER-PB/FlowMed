@@ -110,14 +110,22 @@ Return IP pool name
 Return true if L2 advertisement is enabled
 */}}
 {{- define "metallb.l2AdvertisementEnabled" -}}
-{{- and .Values.l2Advertisement.enabled (include "metallb.ipPoolEnabled" .) }}
+{{- if and .Values.l2Advertisement.enabled (eq (include "metallb.ipPoolEnabled" .) "true") -}}
+true
+{{- else -}}
+false
+{{- end -}}
 {{- end }}
 
 {{/*
 Return true if BGP is enabled
 */}}
 {{- define "metallb.bgpEnabled" -}}
-{{- and .Values.bgp.enabled .Values.bgpAdvertisement.enabled }}
+{{- if and .Values.bgp.enabled .Values.bgpAdvertisement.enabled -}}
+true
+{{- else -}}
+false
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -132,7 +140,11 @@ Return true if any BGP peer is enabled
 {{- end }}
 {{- end }}
 {{- end }}
-{{- $enabled }}
+{{- if $enabled -}}
+true
+{{- else -}}
+false
+{{- end -}}
 {{- end }}
 
 {{/*

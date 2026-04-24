@@ -1,4 +1,4 @@
-{{- if and .Values.enabled (include "metallb.bgpEnabled" .) }}
+{{- if and .Values.enabled (eq (include "metallb.bgpEnabled" .) "true") }}
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:

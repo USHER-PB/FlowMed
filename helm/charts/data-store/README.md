@@ -39,9 +39,10 @@ This chart deploys:
 helm dependency build ./helm/charts/data-store
 
 # Install with local values
+# In the OM cluster, deploy this release into the fineract namespace.
 helm install data-store ./helm/charts/data-store \
   -f values-local.yaml \
-  -n development --create-namespace
+  -n fineract --create-namespace
 ```
 
 ### Production (External Services)
@@ -241,6 +242,7 @@ minio:
    ```bash
    helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
    ```
+   The CNPG operator should live in its own `cnpg-system` namespace. Install it before switching `postgres.mode` to `cnpg`. In this cluster, deploy the `data-store` release into `fineract`, and the chart will create the PostgreSQL `Cluster` custom resource there using the CNPG API.
 
 2. **Sealed Secrets** (for GitOps-compatible secrets):
    ```bash
@@ -248,7 +250,7 @@ minio:
    helm install sealed-secrets sealed-secrets/sealed-secrets -n kube-system
    
    # Create sealed secrets for credentials
-   # See configs/secrets-templates/ for examples
+   # See configs/secrets/ for examples
    ```
 
 3. **Storage Class** with volume expansion support (for PVC resizing)
@@ -256,8 +258,10 @@ minio:
 > **Important Notes**:
 > - CNPG requires specific PostgreSQL images from `ghcr.io/cloudnative-pg/postgresql` (not standard `postgres` images)
 > - CNPG images use UID 26 - do not set `postgresUID`/`postgresGID` in CNPG mode
+> - The CNPG operator must already be installed in `cnpg-system` before deploying this chart in `cnpg` mode
 > - MinIO distributed mode requires network policies to allow inter-pod communication (automatically configured)
 > - Minimum 2 nodes required for HA (3+ recommended for production)
+> - Current HA sizing in this repository is intentionally modest for a 3-node cluster: PostgreSQL requests 200m CPU / 512Mi memory with 5Gi data + 2Gi WAL, and MinIO requests 100m CPU / 512Mi memory with 2Gi distributed storage per replica
 
 ### Mixed Mode Examples
 

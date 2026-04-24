@@ -20,16 +20,54 @@ MetalLB provides a network load-balancer implementation for Kubernetes clusters 
 - Helm 3.0+
 - Network configuration that allows ARP/NDP or BGP
 
+### Helm Repository
+
+```bash
+# Add the MetalLB Helm repository if you want to refresh dependencies
+helm repo add metallb https://metallb.github.io/metallb
+
+# Update repositories
+helm repo update
+```
+
+> Note: this wrapper chart already vendors the MetalLB dependency under `helm/charts/metallb/charts`, so `helm dependency build` is only needed when you intentionally update the dependency lockfile.
+
 ## Installation
+
+### CRD Bootstrap
+
+MetalLB's `IPAddressPool`, `L2Advertisement`, and related resources require the MetalLB CRDs to exist before the Helm release can render cleanly.
+
+This wrapper chart vendors the MetalLB dependency, including the `crds` subchart, under `helm/charts/metallb/charts`. In this repository we bootstrap the CRDs once, then install the wrapper chart with the CRD subchart disabled so Helm only manages the runtime resources:
+
+```bash
+# Apply the MetalLB CRDs once
+helm template metallb-crds ./helm/charts/metallb/charts/metallb/charts/crds --include-crds \
+  | kubectl apply -f -
+
+# Install the wrapper chart after the CRDs exist
+helm install metallb ./helm/charts/metallb \
+  -n metallb-system --create-namespace \
+  --set metallb.crds.enabled=false
+```
+
+If you later refresh the MetalLB dependency, keep the CRD and chart versions aligned.
 
 ### Quick Start
 
 ```bash
 # Install with default values (L2 mode, IP range 192.168.1.200-210)
-helm install metallb ./helm/charts/metallb
+# MetalLB should run in its dedicated metallb-system namespace
+helm install metallb ./helm/charts/metallb \
+  --kubeconfig=/path/to/kubeconfig \
+  -n metallb-system --create-namespace \
+  --set metallb.crds.enabled=false
 
 # Or with custom IP range
 helm install metallb ./helm/charts/metallb \
+  --kubeconfig=/path/to/kubeconfig \
+  -n metallb-system --create-namespace \
+  --set metallb.crds.enabled=false \
   --set ipAddressPools.primary.addresses[0]="10.0.0.100-10.0.0.200"
 ```
 

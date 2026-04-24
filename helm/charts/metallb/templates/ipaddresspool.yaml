@@ -1,4 +1,4 @@
-{{- if and .Values.enabled (include "metallb.ipPoolEnabled" .) }}
+{{- if and .Values.enabled (eq (include "metallb.ipPoolEnabled" .) "true") }}
 {{- $fullname := include "metallb.fullname" . }}
 {{- $namespace := include "metallb.namespace" . }}
 {{- range $name, $pool := .Values.ipAddressPools }}

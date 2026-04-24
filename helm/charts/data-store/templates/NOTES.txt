@@ -14,7 +14,13 @@ Namespace: {{ include "data-store.namespace" . }}
 PostgreSQL
 ================================================================================
 
+{{- if eq .Values.postgres.mode "cnpg" }}
+PostgreSQL is deployed in CNPG mode.
+{{- else if eq .Values.postgres.mode "external" }}
+PostgreSQL is configured for an external database.
+{{- else }}
 PostgreSQL is deployed in standalone mode.
+{{- end }}
 
 Connection Details:
   Host: {{ include "data-store.postgresHost" . }}
@@ -55,7 +61,13 @@ Credentials are stored in secret: {{ .Values.postgres.external.existingSecret }}
 MinIO S3 Storage
 ================================================================================
 
+{{- if eq .Values.minio.mode "distributed" }}
+MinIO is deployed in distributed mode.
+{{- else if eq .Values.minio.mode "external" }}
+MinIO is configured for external S3 storage.
+{{- else }}
 MinIO is deployed in standalone mode.
+{{- end }}
 
 Connection Details:
   Endpoint: {{ include "data-store.minioEndpoint" . }}

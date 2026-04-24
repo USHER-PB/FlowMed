@@ -42,6 +42,8 @@ helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
 kubectl get pods -n cnpg-system
 ```
 
+The CNPG operator should live in its own `cnpg-system` namespace. Install it before setting `mode=cnpg` so the chart can create the PostgreSQL `Cluster` custom resource through the CNPG API.
+
 > **Why CNPG?** CloudNativePG is a Kubernetes-native PostgreSQL operator that provides:
 > - High availability with automatic failover
 > - Synchronous replication for zero data loss
@@ -118,6 +120,8 @@ helm install postgres ./helm/charts/postgres \
 ### CloudNativePG (CNPG) Mode
 
 CloudNativePG provides production-grade PostgreSQL with high availability, automatic failover, and backup support.
+
+> **Prerequisite**: The CNPG operator must already be installed in `cnpg-system` before deploying this chart in `cnpg` mode.
 
 > **Important**: CNPG requires specific PostgreSQL images from `ghcr.io/cloudnative-pg/postgresql`. Standard `postgres:17-alpine` images will NOT work because CNPG's initdb doesn't run the Docker entrypoint script. The chart defaults to `ghcr.io/cloudnative-pg/postgresql:17.2`.
 

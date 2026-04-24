@@ -29,7 +29,7 @@ postgres:
     database: appdb
     username: appuser
     # Use existing secret for GitOps (sealed-secrets)
-    # Create sealed secret from configs/secrets-templates/data-store-postgres-sealed.yaml
+    # Create sealed secret from configs/secrets/data-store-postgres-sealed.yaml
     existingSecret: "data-store-postgres"
     # Password keys in the secret
     secretKeys:
@@ -110,7 +110,7 @@ minio:
   auth:
     rootUser: minioadmin
     # Use existing secret for GitOps (sealed-secrets)
-    # Create sealed secret from configs/secrets-templates/data-store-minio-sealed.yaml
+    # Create sealed secret from configs/secrets/data-store-minio-sealed.yaml
     existingSecret: "data-store-minio"
     # Password key in the secret
     secretKeys:

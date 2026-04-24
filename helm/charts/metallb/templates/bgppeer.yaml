@@ -1,4 +1,4 @@
-{{- if and .Values.enabled (include "metallb.bgpPeerEnabled" .) }}
+{{- if and .Values.enabled (eq (include "metallb.bgpPeerEnabled" .) "true") }}
 {{- $fullname := include "metallb.fullname" . }}
 {{- $namespace := include "metallb.namespace" . }}
 {{- range .Values.bgp.peers }}
