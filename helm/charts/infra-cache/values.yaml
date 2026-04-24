@@ -29,11 +29,11 @@ redis:
       storageClass: longhorn
     resources:
       requests:
-        memory: "128Mi"
-        cpu: "100m"
+        memory: "64Mi"
+        cpu: "50m"
       limits:
-        memory: "256Mi"
-        cpu: "250m"
+        memory: "128Mi"
+        cpu: "150m"
 
   # Replica (and implicitly Sentinel) persistence and resources
   # 3 nodes total for proper HA quorum (each pod runs Redis + Sentinel)
@@ -45,11 +45,11 @@ redis:
       storageClass: longhorn
     resources:
       requests:
-        memory: "128Mi"
-        cpu: "100m"
+        memory: "64Mi"
+        cpu: "50m"
       limits:
-        memory: "256Mi"
-        cpu: "250m"
+        memory: "128Mi"
+        cpu: "150m"
 
   # Disable Bitnami's built-in metrics in favor of the standalone prometheus-community exporter below
   metrics:
