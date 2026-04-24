@@ -219,6 +219,9 @@ When network policies are enabled (`networkPolicy.enabled: true`), the chart aut
 
 Buckets are created using an init job that runs after MinIO is ready:
 
+> **Note**: The bucket-init job waits for MinIO to become reachable before it creates buckets. On slower clusters or a fresh first boot, that can take a while, so the chart leaves the job without a hard deadline by default.
+> The job also mounts `/tmp` as an `emptyDir` and sets `HOME=/tmp` plus `MC_CONFIG_DIR=/tmp/.mc` because it runs as a non-root user with a read-only root filesystem.
+
 ```yaml
 buckets:
   - name: documents

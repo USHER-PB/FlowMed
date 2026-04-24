@@ -13,7 +13,9 @@ metadata:
   {{- end }}
 spec:
   backoffLimit: {{ .Values.bucketInit.backoffLimit }}
-  activeDeadlineSeconds: {{ .Values.bucketInit.activeDeadlineSeconds }}
+  {{- with .Values.bucketInit.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
   template:
     metadata:
       labels:
@@ -88,6 +90,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "minio.secretName" . }}
                   key: root-password
+            - name: HOME
+              value: /tmp
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+            - name: XDG_CONFIG_HOME
+              value: /tmp
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -96,6 +104,12 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.bucketInit.resources | nindent 12 }}
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
 {{- end }}

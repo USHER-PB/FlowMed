@@ -174,12 +174,11 @@ minio:
   
   # Distributed High Availability (when mode: distributed)
   # MinIO distributed mode provides erasure coding and data replication
-  # NOTE: Reduced for 2-node cluster - use 4+ nodes for production HA
   distributed:
-    replicas: 2  # Minimum for 2-node cluster (production: 4, 6, 8, 12, or 16)
+    replicas: 2  # Minimum for this local test cluster (production: 4, 6, 8, 12, or 16)
     drivesPerNode: 1
     storage:
-      # Reduced size for 2-node cluster with limited storage
+      # Reduced size for local development with limited storage
       size: 2Gi
       storageClass: ""
     podAntiAffinity:

@@ -303,8 +303,9 @@ bucketInit:
       cpu: 50m
   # Backoff limit
   backoffLimit: 5
-  # Active deadline seconds
-  activeDeadlineSeconds: 300
+  # Optional active deadline seconds.
+  # Leave unset so the job can wait for MinIO readiness on slower first boots.
+  activeDeadlineSeconds:
 
 # =============================================================================
 # Common Labels and Annotations

@@ -13,6 +13,9 @@ metadata:
 spec:
   serviceName: {{ include "minio.fullname" . }}-headless
   replicas: {{ include "minio.replicas" . }}
+  {{- if (include "minio.distributedEnabled" .) }}
+  podManagementPolicy: Parallel
+  {{- end }}
   selector:
     matchLabels:
       {{- include "minio.selectorLabels" . | nindent 6 }}
