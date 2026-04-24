@@ -1,0 +1,28 @@
+{{/*
+=============================================================================
+Fineract Batch Instance Service
+=============================================================================
+Validates: Requirements 1.7
+=============================================================================
+*/}}
+{{- if .Values.fineract.batch.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-batch
+  labels:
+    {{- include "fineract-core.batch.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-core.batch.selectorLabels" . | nindent 4 }}
+{{- end }}

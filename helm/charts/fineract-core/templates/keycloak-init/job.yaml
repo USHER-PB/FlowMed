@@ -1,0 +1,183 @@
+{{- if .Values.keycloakInit.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-keycloak-init
+  labels:
+    {{- include "fineract-core.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-init
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: keycloak-init
+        image: "nicolaka/netshoot:latest"
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: KEYCLOAK_URL
+          value: {{ .Values.keycloakInit.url | quote }}
+        - name: KEYCLOAK_ADMIN
+          value: {{ .Values.keycloakInit.adminUser | default "admin" | quote }}
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.keycloak.secretName }}
+              key: {{ .Values.secrets.keycloak.adminPasswordKey | default "admin-password" }}
+        - name: REALM_NAME
+          value: {{ .Values.keycloakInit.realm | default "fineract" | quote }}
+        - name: CLIENT_ID
+          value: {{ .Values.userSync.keycloak.clientId | quote }}
+        - name: CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.userSync.secretName }}
+              key: {{ .Values.secrets.userSync.clientSecretKey | default "client-secret" }}
+        - name: REDIRECT_URIS
+          value: {{ .Values.keycloakInit.redirectUris | default "[\"https://fineract.local/*\"]" | quote }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Waiting for Keycloak to be ready..."
+          until curl -s -o /dev/null -w "%{http_code}" ${KEYCLOAK_URL}/realms/master | grep -q "200"; do
+            echo "Keycloak is unavailable - sleeping"
+            sleep 5
+          done
+          
+          echo "Keycloak is up - getting admin token..."
+          
+          # Get admin access token
+          TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "username=${KEYCLOAK_ADMIN}" \
+            -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" | jq -r '.access_token')
+          
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to get admin token"
+            exit 1
+          fi
+          
+          echo "Checking if realm ${REALM_NAME} exists..."
+          
+          # Check if realm exists
+          REALM_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${KEYCLOAK_URL}/admin/realms/${REALM_NAME}")
+          
+          if [ "$REALM_EXISTS" != "200" ]; then
+            echo "Creating realm: ${REALM_NAME}"
+            
+            # Create realm
+            curl -s -X POST "${KEYCLOAK_URL}/admin/realms" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "realm": "'"${REALM_NAME}"'",
+                "enabled": true,
+                "displayName": "Fineract",
+                "sslRequired": "external",
+                "registrationAllowed": false,
+                "loginWithEmailAllowed": true,
+                "duplicateEmailsAllowed": false,
+                "resetPasswordAllowed": true,
+                "editUsernameAllowed": false,
+                "bruteForceProtected": true
+              }'
+            
+            echo "Realm ${REALM_NAME} created"
+          else
+            echo "Realm ${REALM_NAME} already exists"
+          fi
+          
+          echo "Checking if client ${CLIENT_ID} exists..."
+          
+          # Check if client exists
+          CLIENT_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients?clientId=${CLIENT_ID}")
+          
+          if [ "$CLIENT_EXISTS" = "200" ]; then
+            # Check if client list is empty
+            CLIENT_COUNT=$(curl -s \
+              -H "Authorization: Bearer ${TOKEN}" \
+              "${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients?clientId=${CLIENT_ID}" | jq 'length')
+            
+            if [ "$CLIENT_COUNT" = "0" ]; then
+              echo "Creating client: ${CLIENT_ID}"
+              
+              # Create client
+              curl -s -X POST "${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "clientId": "'"${CLIENT_ID}"'",
+                  "name": "User Sync Service",
+                  "enabled": true,
+                  "clientAuthenticatorType": "client-secret",
+                  "secret": "'"${CLIENT_SECRET}"'",
+                  "redirectUris": '"${REDIRECT_URIS}"',
+                  "webOrigins": ["+"],
+                  "bearerOnly": false,
+                  "consentRequired": false,
+                  "standardFlowEnabled": true,
+                  "implicitFlowEnabled": false,
+                  "directAccessGrantsEnabled": true,
+                  "serviceAccountsEnabled": true,
+                  "publicClient": false,
+                  "frontchannelLogout": false,
+                  "protocol": "openid-connect",
+                  "attributes": {
+                    "access.token.lifespan": "3600",
+                    "saml.assertion.signature": "false",
+                    "saml.force.post.binding": "false",
+                    "saml.multivalued.roles": "false",
+                    "saml.encrypt": "false",
+                    "saml.server.signature": "false",
+                    "saml.server.signature.keyinfo.ext": "false",
+                    "exclude.session.state.from.auth.response": "false",
+                    "saml.artifact.binding": "false",
+                    "saml_force_name_id_format": "false",
+                    "acr.loa.map": "{}",
+                    "tls.client.certificate.bound.access.tokens": "false",
+                    "saml.authnstatement": "false",
+                    "display.on.consent.screen": "false",
+                    "saml.onetimeuse.condition": "false"
+                  }
+                }'
+              
+              echo "Client ${CLIENT_ID} created"
+            else
+              echo "Client ${CLIENT_ID} already exists"
+            fi
+          fi
+          
+          echo "Keycloak initialization completed successfully"
+        resources:
+          {{- toYaml .Values.keycloakInit.resources | nindent 10 }}
+{{- end }}

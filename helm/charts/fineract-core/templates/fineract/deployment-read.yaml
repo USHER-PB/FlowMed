@@ -1,0 +1,164 @@
+{{/*
+=============================================================================
+Fineract Read Instance Deployment
+=============================================================================
+Validates: Requirements 1.2, 2.1, 2.4, 2.5, 2.6, 2.7, 12.1, 12.2, 13.1, 13.2, 1.7
+=============================================================================
+*/}}
+{{- if .Values.fineract.read.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-read
+  labels:
+    {{- include "fineract-core.read.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.fineract.read.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "fineract-core.read.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.read.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: fineract-read
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "fineract-core.fineractImage" . }}
+          imagePullPolicy: {{ .Values.fineract.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: management
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Fineract instance mode
+            - name: FINERACT_NODE_ID
+              value: "2"
+            - name: FINERACT_MODE_READ_ENABLED
+              value: "true"
+            # Management port for health checks and metrics
+            - name: MANAGEMENT_SERVER_PORT
+              value: "9090"
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            # PostgreSQL connection - using FINERACT_HIKARI_* variables
+            # Tenant Store Database - for managing tenant connections
+            - name: FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME
+              value: "org.postgresql.Driver"
+            - name: FINERACT_HIKARI_JDBC_URL
+              value: "jdbc:postgresql://{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.tenantStoreName }}"
+            - name: FINERACT_HIKARI_USERNAME
+              value: {{ .Values.database.username | quote }}
+            - name: FINERACT_HIKARI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: password
+            # Connection pool settings
+            - name: FINERACT_HIKARI_MAXIMUM_POOL_SIZE
+              value: {{ .Values.database.connectionPool.maxPoolSize | quote }}
+            - name: FINERACT_HIKARI_MINIMUM_IDLE
+              value: {{ .Values.database.connectionPool.minIdle | quote }}
+            - name: FINERACT_HIKARI_CONNECTION_TIMEOUT
+              value: {{ .Values.database.connectionPool.connectionTimeout | quote }}
+            - name: FINERACT_HIKARI_IDLE_TIMEOUT
+              value: "60000"
+            - name: FINERACT_HIKARI_MAX_LIFETIME
+              value: "1800000"
+            - name: FINERACT_HIKARI_LEAK_DETECTION_THRESHOLD
+              value: "30000"
+            - name: FINERACT_HIKARI_CONNECTION_TEST_QUERY
+              value: "SELECT 1"
+            # Default Tenant Database - for application data
+            - name: FINERACT_DEFAULT_TENANTDB_HOSTNAME
+              value: {{ .Values.database.host | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_IDENTIFIER
+              value: "default"
+            - name: FINERACT_DEFAULT_TENANTDB_NAME
+              value: {{ .Values.database.tenantName | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_UID
+              value: {{ .Values.database.username | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: password
+            # Redis connection
+            - name: FINERACT_REDIS_HOST
+              value: {{ .Values.redis.host | quote }}
+            - name: FINERACT_REDIS_PORT
+              value: {{ .Values.redis.port | quote }}
+            - name: FINERACT_REDIS_DATABASE
+              value: {{ .Values.redis.database | quote }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+              scheme: HTTPS
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: management
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 40
+          resources:
+            requests:
+              cpu: {{ .Values.fineract.read.resources.requests.cpu }}
+              memory: {{ .Values.fineract.read.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.fineract.read.resources.limits.cpu }}
+              memory: {{ .Values.fineract.read.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

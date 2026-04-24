@@ -1,0 +1,28 @@
+{{/*
+=============================================================================
+OAuth2-Proxy Service
+=============================================================================
+Validates: Requirements 1.7
+=============================================================================
+*/}}
+{{- if .Values.oauth2Proxy.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-oauth2-proxy
+  labels:
+    {{- include "fineract-core.oauth2Proxy.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4180
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-core.oauth2Proxy.selectorLabels" . | nindent 4 }}
+{{- end }}

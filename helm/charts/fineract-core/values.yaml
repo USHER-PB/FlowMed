@@ -1,0 +1,286 @@
+# =============================================================================
+# Fineract Core Helm Chart - Default Values
+# =============================================================================
+# This chart deploys the Apache Fineract core banking engine with:
+# - Fineract Read/Write/Batch instances
+# - NGINX Gateway for routing
+# - OAuth2-Proxy for authentication
+# - User Sync Service for Keycloak integration
+# - Config CLI Job for bootstrap configuration
+# =============================================================================
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+global:
+  domain: example.com
+  environment: production
+
+# =============================================================================
+# Fineract Instances Configuration
+# =============================================================================
+
+fineract:
+  image:
+    repository: apache/fineract
+    tag: "1.8.0"
+    pullPolicy: IfNotPresent
+
+  # Read instance - optimized for query operations
+  read:
+    enabled: true
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+
+  # Write instance - handles transaction operations
+  write:
+    enabled: true
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+
+  # Batch instance - processes scheduled jobs
+  batch:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+
+database:
+  host: postgresql-primary.database.svc.cluster.local
+  port: 5432
+  # Tenant store database - for managing tenant connections
+  tenantStoreName: fineract_tenants
+  # Default tenant database - for application data
+  tenantName: fineract_default
+  username: fineract
+  # Password should be set via secrets.database.password
+  connectionPool:
+    maxPoolSize: 20
+    minIdle: 5
+    connectionTimeout: 30000
+
+# =============================================================================
+# Redis Configuration
+# =============================================================================
+
+redis:
+  host: redis-master.cache.svc.cluster.local
+  port: 6379
+  database: 0
+
+# =============================================================================
+# NGINX Gateway Configuration
+# =============================================================================
+
+gateway:
+  enabled: true
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ingress:
+    enabled: true
+    className: nginx
+    hostname: api.fineract.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls:
+      enabled: true
+      secretName: fineract-api-tls
+
+# =============================================================================
+# OAuth2 Proxy Configuration
+# =============================================================================
+
+oauth2Proxy:
+  enabled: true
+  image:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: "v7.5.1"
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  keycloak:
+    url: https://keycloak.example.com
+    realm: fineract
+    clientId: fineract-api
+    # clientSecret should be set via secrets.oauth2Proxy.clientSecret
+  redirectUrl: https://api.fineract.example.com/oauth2/callback
+
+# =============================================================================
+# User Sync Service Configuration
+# =============================================================================
+
+userSync:
+  enabled: true
+  image:
+    repository: fineract/user-sync
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  syncIntervalSeconds: 300
+  # Keycloak connection settings for user synchronization
+  keycloak:
+    url: https://keycloak.example.com
+    realm: fineract
+
+# =============================================================================
+# Config CLI Job Configuration
+# =============================================================================
+
+configCli:
+  enabled: true
+  image:
+    repository: fineract/config-cli
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  bootstrapData:
+    tenants: []
+    users: []
+    roles: []
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+# This chart references SealedSecret resources that must be created separately.
+# The SealedSecrets should be created before deploying this chart.
+#
+# Example SealedSecret creation:
+#   kubectl create secret generic fineract-db-secret \
+#     --from-literal=password=<your-password> \
+#     --namespace <namespace> \
+#     --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret.yaml
+#
+# Required SealedSecret keys:
+#   - Database secret: password
+#   - Keycloak secret: clientId, clientSecret
+#   - OAuth2 Proxy secret: cookieSecret
+#   - Fineract API secret: username, password
+
+secrets:
+  database:
+    # Set to true to create the Secret via this chart
+    # For production, set to false and use external-secrets-operator or SealedSecrets
+    create: false
+    # Name of the Secret containing database credentials
+    # Required key: password
+    secretName: fineract-db-secret
+    # Database password (used when create: true)
+    # For production, leave empty and use external secret management
+    password: ""
+  keycloak:
+    # Name of the SealedSecret containing Keycloak client credentials
+    # Required keys: clientId, clientSecret
+    # Used by: User Sync Service, OAuth2 Proxy
+    secretName: fineract-keycloak-sealed
+  oauth2Proxy:
+    # Name of the SealedSecret containing OAuth2 Proxy secrets
+    # Required keys: clientId, clientSecret, cookieSecret
+    secretName: fineract-oauth2-proxy-sealed
+  fineractApi:
+    # Name of the SealedSecret containing Fineract API credentials
+    # Required keys: username, password
+    # Used by: User Sync Service, Config CLI Job
+    secretName: fineract-api-sealed
+
+# =============================================================================
+# Service Account Configuration
+# =============================================================================
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/fineract-role
+
+# =============================================================================
+# Image Pull Secrets
+# =============================================================================
+
+imagePullSecrets: []
+
+# =============================================================================
+# Pod Security Context
+# =============================================================================
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+
+commonLabels: {}
+
+commonAnnotations: {}
