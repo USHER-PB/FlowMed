@@ -60,6 +60,9 @@ ingress:
 ### 2. Deploy Your Application
 
 ```bash
+# Build dependencies first (even if none currently specified)
+helm dependency build ./helm/charts/base-app
+
 # Using Helm directly
 helm upgrade --install my-app ./helm/charts/base-app \
   -f my-app-values.yaml \

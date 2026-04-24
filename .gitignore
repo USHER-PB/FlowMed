@@ -51,3 +51,12 @@ TODO.md
 **/charts/charts/
 **/charts/*.tgz
 Chart.lock
+**/Chart.lock
+
+# Ignore embedded chart dependencies (upstream charts downloaded by helm dependency update)
+# This ignores the entire charts/ subdirectory within each wrapper chart
+helm/charts/*/charts/
+
+# Binary tools
+kubeseal*
+*.tar.gz

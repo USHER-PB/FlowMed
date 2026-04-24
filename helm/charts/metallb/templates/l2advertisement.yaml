@@ -1,0 +1,27 @@
+{{- if and .Values.enabled (eq (include "metallb.l2AdvertisementEnabled" .) "true") }}
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: {{ include "metallb.fullname" . }}-l2
+  namespace: {{ include "metallb.namespace" . }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: l2-advertisement
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.l2Advertisement.ipAddressPools }}
+  ipAddressPools:
+    {{- toYaml .Values.l2Advertisement.ipAddressPools | nindent 4 }}
+  {{- end }}
+  {{- if .Values.l2Advertisement.ipAddressPoolSelectors }}
+  ipAddressPoolSelectors:
+    {{- toYaml .Values.l2Advertisement.ipAddressPoolSelectors | nindent 4 }}
+  {{- end }}
+  {{- if .Values.l2Advertisement.nodeSelectors }}
+  nodeSelectors:
+    {{- toYaml .Values.l2Advertisement.nodeSelectors | nindent 4 }}
+  {{- end }}
+{{- end }}
