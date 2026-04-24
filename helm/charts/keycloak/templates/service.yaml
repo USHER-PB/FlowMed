@@ -1,0 +1,27 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  type: {{ .Values.keycloak.serviceType | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.keycloak.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if .Values.keycloak.nodePort }}
+      nodePort: {{ .Values.keycloak.nodePort }}
+      {{- end }}
+    - port: 9000
+      targetPort: management
+      protocol: TCP
+      name: management
+  selector:
+    {{- include "keycloak.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+{{- end }}

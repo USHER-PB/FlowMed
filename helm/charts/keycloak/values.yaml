@@ -1,0 +1,105 @@
+# ArgoCD projects must whitelist PriorityClass and allow ResourceQuota (see argocd/projects/)
+# Release workflows use SSH deploy key (DEPLOY_KEY secret) to bypass branch protection
+global:
+  namespace: fineract
+  imagePullSecrets: []
+  # - name: ghcr-secret
+  priorityClasses:
+    enabled: false
+
+secrets:
+  mode: existing  # "generate" for infra-first deployment, "existing" when service secrets exist
+
+# PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in fineract namespace)
+postgres:
+  namespace: fineract  # PostgreSQL namespace for NetworkPolicy egress
+  # CloudNativePG creates -rw, -ro, -r services. Use -rw for read-write access
+  host: data-store-postgres-rw.fineract.svc.cluster.local  # PostgreSQL RW service in fineract namespace
+  port: 5432
+  keycloak:
+    user: keycloak
+    password: keycloak_password
+    database: keycloak
+  existingSecret: "keycloak-postgres"  # SealedSecret containing KEYCLOAK_DB_USER and KEYCLOAK_DB_PASSWORD
+
+networkPolicies:
+  enabled: true
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.5.2"  # Keycloak 26.5.2 - latest stable with Java 21 support for keybound plugin
+  replicas: 1
+  port: 8080
+  admin:
+    user: admin
+    password: admin
+  mode: start  # "start-dev" for local dev only, "start" for production (KC_BOOTSTRAP_* env vars create admin user)
+  # Public URL that determines the 'iss' claim in tokens
+  # Must match fineract.oauth.issuerUri in fineract-platform values
+  # NOTE: Must include protocol (http:// or https://) for Keycloak 26+ frontendUrl
+  hostnameUrl: "http://auth.fineract.local"  # Full URL with protocol for realm frontendUrl
+  externalAppUrl: "http://fineract.local"
+  # Keybound plugin for external user storage SPI
+  keybound:
+    enabled: true  # Enable to install keybound Keycloak plugins
+    version: "0.2.5"
+    realm: fineract
+    userStorageUrl: "http://user-storage:3000/kc"
+    existingSecret: "keycloak-keybound"  # SealedSecret containing KEYBOUND_SIGNATURE_SECRET, KEYBOUND_AUTH_USERNAME, KEYBOUND_AUTH_PASSWORD
+    signatureVersion: "1"
+    actor: "keycloak-u-fineract"
+    nonceCacheTtl: "60"
+  ingress:
+    enabled: true
+    blockAdminUI: false  # Set true for UAT/prod to block /admin and /realms/master
+    className: nginx
+    host: "auth.fineract.local"
+    tls:
+      enabled: false
+  resources:
+    requests:
+      memory: "384Mi"
+      cpu: "250m"
+    limits:
+      memory: "768Mi"
+      cpu: "1"
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPU: 70
+    # WARNING: Do not set targetMemory for Keycloak (JVM). JVM pre-allocates heap
+    # and memory utilization will appear permanently high, causing runaway scale-out.
+  pdb:
+    enabled: false  # Enable when replicas >= 2 (UAT/prod)
+  existingSecret: "keycloak-keycloak"  # SealedSecret containing KEYCLOAK_ADMIN and KEYCLOAK_ADMIN_PASSWORD
+
+keycloakConfig:
+  enabled: true
+  environment: dev  # dev | uat | prod — controls realm user provisioning
+  verifyEmail: true  # Email verification enabled by default (Mailpit catches in dev)
+  # Realm security settings — override for cloud/production
+  sslRequired: "none"             # Set "EXTERNAL" for HTTPS environments
+  accessTokenLifespan: 1800       # Set 900 (15 min) for production
+  # SMTP settings — defaults to Mailpit for local dev
+  smtp:
+    host: "mailpit"
+    port: "1025"
+    from: "noreply@webank.dev"
+    fromDisplayName: "Webank"
+    replyTo: "support@webank.dev"
+    replyToDisplayName: "Webank Support"
+    ssl: "false"
+    starttls: "false"
+    auth: "false"
+  # Realm user passwords (override in production with strong values via sealed secrets)
+  # In non-dev environments, passwords are set as temporary (force change on first login)
+  realmUsers:
+    adminPassword: "admin1234"      # Keycloak realm admin
+    mifosPassword: "password"        # Fineract super admin (well-known default — MUST change in prod)
+    kycAdminPassword: "password"     # KYC Manager demo admin (dev only)
+  image:
+    repository: adorsys/keycloak-config-cli
+    tag: "6.5.0-26.5.4"  # Must match Keycloak version (6.5.0 for Keycloak 26.5.x)

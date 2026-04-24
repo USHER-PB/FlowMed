@@ -1,0 +1,28 @@
+{{/*
+=============================================================================
+NGINX Gateway Service
+=============================================================================
+Validates: Requirements 1.7
+=============================================================================
+*/}}
+{{- if .Values.gateway.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-gateway
+  labels:
+    {{- include "fineract-core.gateway.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-core.gateway.selectorLabels" . | nindent 4 }}
+{{- end }}

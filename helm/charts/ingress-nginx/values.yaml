@@ -1,0 +1,92 @@
+# =============================================================================
+# Ingress NGINX Helm Chart - Default Values
+# =============================================================================
+# Standardized NGINX Ingress Controller configuration.
+# =============================================================================
+
+# =============================================================================
+# Ingress NGINX Controller Configuration
+# =============================================================================
+ingress-nginx:
+  # Enable the ingress-nginx controller
+  enabled: true
+  
+  # Deployment mode:
+  # - "standalone": Single Nginx instance (local/dev)
+  # - "ha": High Availability mode (Production)
+  mode: standalone
+
+  controller:
+    # Managed by the mode toggle below
+    replicaCount: 1
+    
+    # Use LoadBalancer service type with MetalLB
+    # MetalLB will assign an external IP from the configured pool
+    hostNetwork: false
+    hostPort:
+      enabled: false
+    
+    # Image configuration
+    image:
+      registry: registry.k8s.io
+      image: ingress-nginx/controller
+      tag: v1.9.4
+      pullPolicy: IfNotPresent
+    
+    # Resource allocation
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 80
+    
+    # Service configuration - LoadBalancer type for external access
+    service:
+      type: LoadBalancer
+      internal:
+        enabled: true
+      annotations: {}
+    
+    # Metrics configuration
+    metrics:
+      enabled: false
+      serviceMonitor:
+        enabled: false
+    
+    # ConfigMap data
+    config:
+      use-forwarded-headers: "true"
+      compute-full-forwarded-for: "true"
+      use-proxy-protocol: "false"
+      log-format-upstream: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id'
+
+    # Pod Security Configuration
+    # NOTE: readOnlyRootFilesystem is disabled because ingress-nginx needs to write
+    # to /etc/nginx/ for dynamic configuration updates. This is a known limitation.
+    # See: https://github.com/kubernetes/ingress-nginx/issues/6256
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+        add:
+          - NET_BIND_SERVICE
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 82
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+commonLabels: {}
+commonAnnotations: {}

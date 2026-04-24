@@ -1,0 +1,181 @@
+# =============================================================================
+# Sealed Secrets Helm Chart - Default Values
+# =============================================================================
+# GitOps-friendly secrets management using Bitnami Sealed Secrets.
+# Allows you to encrypt secrets that can be stored in Git and decrypted in-cluster.
+# =============================================================================
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  # Override namespace (defaults to release namespace)
+  namespace: ""
+  # Image pull secrets for private registries
+  imagePullSecrets: []
+  # Priority class name for pods
+  priorityClassName: ""
+
+# =============================================================================
+# Sealed Secrets Controller Configuration
+# =============================================================================
+sealed-secrets:
+  # Enable the sealed-secrets controller
+  enabled: true
+  
+  # Additional labels for all resources
+  extraLabels: {}
+  
+  # Additional annotations for all resources
+  extraAnnotations: {}
+  
+  # =============================================================================
+  # Controller Settings
+  # =============================================================================
+  # Number of replicas (usually 1 for single controller)
+  replicaCount: 1
+  
+  # Image configuration
+  image:
+    registry: docker.io
+    repository: bitnami/sealed-secrets-controller
+    tag: 0.27.0
+    pullPolicy: IfNotPresent
+  
+  # Resource allocation
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 50m
+      memory: 50Mi
+  
+  # =============================================================================
+  # Security Settings
+  # =============================================================================
+  # Run as non-root
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1001
+  
+  # =============================================================================
+  # Service Configuration
+  # =============================================================================
+  service:
+    type: ClusterIP
+    port: 8080
+    annotations: {}
+  
+  # =============================================================================
+  # Ingress Configuration (for public key retrieval)
+  # =============================================================================
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: sealed-secrets.local
+        paths:
+          - path: /v1/cert.pem
+            pathType: ImplementationSpecific
+    tls: []
+  
+  # =============================================================================
+  # RBAC Configuration
+  # =============================================================================
+  rbac:
+    create: true
+    pspEnabled: false
+  
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  
+  # =============================================================================
+  # Key Management
+  # =============================================================================
+  # Key renewal interval
+  keyrenewperiod: "720h"  # 30 days
+  
+  # Whether to accept unsealed secrets from other namespaces
+  # Set to false for stricter security
+  secretInheritance: true
+  
+  # =============================================================================
+  # Metrics/Monitoring
+  # =============================================================================
+  metrics:
+    serviceMonitor:
+      enabled: false
+      labels: {}
+      annotations: {}
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  # =============================================================================
+  # Pod Settings
+  # =============================================================================
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity
+  affinity: {}
+  
+  # Pod annotations
+  podAnnotations: {}
+  
+  # Pod labels
+  podLabels: {}
+  
+  # Priority class name
+  priorityClassName: ""
+
+# =============================================================================
+# Example Sealed Secrets Templates
+# =============================================================================
+# These are templates that can be used to create sealed secrets.
+# Use `kubeseal` to encrypt your secrets before applying.
+templates:
+  # Example: Database credentials template
+  # To use: kubectl create secret generic db-credentials --from-literal=username=appuser --from-literal=password=secret -n default --dry-run=client -o yaml | kubeseal -o yaml > sealed-db.yaml
+  database:
+    enabled: false
+    name: db-credentials
+    namespace: default
+    encryptedData: {}
+    # username: AgB...encrypted...
+    # password: AgB...encrypted...
+  
+  # Example: S3 credentials template
+  s3:
+    enabled: false
+    name: s3-credentials
+    namespace: default
+    encryptedData: {}
+    # access-key-id: AgB...encrypted...
+    # secret-access-key: AgB...encrypted...
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+commonLabels: {}
+commonAnnotations: {}
