@@ -1,0 +1,28 @@
+{{/*
+=============================================================================
+User Sync Service
+=============================================================================
+Validates: Requirements 1.7
+=============================================================================
+*/}}
+{{- if .Values.userSync.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-user-sync
+  labels:
+    {{- include "fineract-core.userSync.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.userSync.port | default 5000 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-core.userSync.selectorLabels" . | nindent 4 }}
+{{- end }}

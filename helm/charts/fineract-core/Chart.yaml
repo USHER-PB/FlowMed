@@ -1,0 +1,31 @@
+apiVersion: v2
+name: fineract-core
+description: |
+  Helm chart for deploying Apache Fineract core banking engine on Kubernetes.
+  This chart deploys Fineract Read, Write, and Batch instances along with
+  NGINX Gateway, OAuth2-Proxy, User Sync Service, and Config CLI Job.
+
+type: application
+version: 1.0.0
+appVersion: "1.8.0"
+
+maintainers:
+  - name: Platform Team
+    email: richmond.jagoum@skyengpro.com
+
+keywords:
+  - fineract
+  - core-banking
+  - microfinance
+  - banking
+  - apache
+  - wave-4
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+  - https://github.com/apache/fineract
+
+annotations:
+  category: Application
+  wave: "4"

@@ -1,0 +1,28 @@
+{{/*
+=============================================================================
+Fineract Write Instance Service
+=============================================================================
+Validates: Requirements 1.7
+=============================================================================
+*/}}
+{{- if .Values.fineract.write.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-write
+  labels:
+    {{- include "fineract-core.write.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-core.write.selectorLabels" . | nindent 4 }}
+{{- end }}
