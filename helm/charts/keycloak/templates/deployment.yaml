@@ -1,0 +1,278 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+  annotations:
+    "argocd.argoproj.io/sync-wave": "3"
+spec:
+  {{- if not .Values.keycloak.hpa.enabled }}
+  replicas: {{ .Values.keycloak.replicas | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        {{- include "keycloak.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak
+    spec:
+      {{- include "keycloak.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: keycloak
+      {{- if .Values.global.priorityClasses.enabled }}
+      priorityClassName: fineract-critical
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.postgres.host }} {{ .Values.postgres.port }}; do
+                echo "Waiting for postgres..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready"
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
+        {{- if .Values.keycloak.keybound.enabled }}
+        - name: download-keybound
+          image: alpine/curl
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              VERSION="{{ .Values.keycloak.keybound.version }}"
+              BASE="https://github.com/stephane-segning/keycloak-keybound/releases/download/v${VERSION}"
+
+              download() {
+                curl -fL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
+                  -o "/providers/$1" "$BASE/$1"
+              }
+
+              download "keycloak-keybound-all-${VERSION}-all.jar"
+              download "keycloak-keybound-api-gateway-http-${VERSION}.jar"
+              download "keycloak-keybound-custom-endpoint-${VERSION}.jar"
+              download "keycloak-keybound-grant-device-key-${VERSION}.jar"
+              download "keycloak-keybound-user-storage-backend-${VERSION}.jar"
+              echo "All keybound plugins downloaded"
+          volumeMounts:
+            - name: keycloak-providers
+              mountPath: /providers
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+        {{- end }}
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          args:
+            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+            # Keycloak 22+ uses start mode with health/metrics
+            - {{ .Values.keycloak.mode }}
+            - --http-enabled=true
+            - --health-enabled=true
+            - --metrics-enabled=true
+            {{- if .Values.keycloak.hostnameUrl }}
+            - --hostname={{ .Values.keycloak.hostnameUrl }}
+            {{- else }}
+            - --hostname-strict=false
+            {{- end }}
+            {{- else }}
+            # Keycloak <22 uses start-dev mode which auto-creates admin from KEYCLOAK_ADMIN env vars
+            - start-dev
+            - --http-enabled=true
+            {{- if .Values.keycloak.hostnameUrl }}
+            - --hostname={{ .Values.keycloak.hostnameUrl }}
+            {{- else }}
+            - --hostname-strict=false
+            {{- end }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.keycloak.port }}
+              name: http
+            - containerPort: 9000
+              name: management
+          env:
+            {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+            # Keycloak 22+ uses KC_* environment variables
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ .Values.postgres.host }}
+            - name: KC_DB_URL_PORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: KC_DB_URL_DATABASE
+              value: {{ .Values.postgres.keycloak.database }}
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_PASSWORD
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            {{- else }}
+            # Keycloak <22 uses legacy environment variables
+            - name: DB_VENDOR
+              value: postgres
+            - name: DB_ADDR
+              value: {{ .Values.postgres.host }}
+            - name: DB_PORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.postgres.keycloak.database }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.postgres.secretName" . }}
+                  key: KEYCLOAK_DB_PASSWORD
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.keycloak.secretName" . }}
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            {{- end }}
+            - name: JAVA_OPTS_APPEND
+              value: "-XX:MaxRAMPercentage=50.0 -XX:+UseStringDeduplication"
+            {{- if .Values.keycloak.keybound.enabled }}
+            - name: BACKEND_HTTP_BASE_PATH_{{ .Values.keycloak.keybound.realm }}
+              value: {{ .Values.keycloak.keybound.userStorageUrl | quote }}
+            - name: BACKEND_HTTP_SIGNATURE_SECRET_{{ .Values.keycloak.keybound.realm }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_SIGNATURE_SECRET
+            - name: BACKEND_HTTP_SIGNATURE_VERSION_{{ .Values.keycloak.keybound.realm }}
+              value: {{ .Values.keycloak.keybound.signatureVersion | quote }}
+            - name: BACKEND_HTTP_ACTOR_{{ .Values.keycloak.keybound.realm }}
+              value: {{ .Values.keycloak.keybound.actor | quote }}
+            - name: BACKEND_HTTP_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_AUTH_USERNAME
+            - name: BACKEND_HTTP_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.keybound.existingSecret | default "keycloak-keybound" }}
+                  key: KEYBOUND_AUTH_PASSWORD
+            - name: BACKEND_HTTP_TELEMETRY_ENABLED_{{ .Values.keycloak.keybound.realm }}
+              value: "true"
+            - name: NONCE_CACHE_TTL_{{ .Values.keycloak.keybound.realm }}
+              value: {{ .Values.keycloak.keybound.nonceCacheTtl | quote }}
+            {{- end }}
+          {{- if not (semverCompare "<22.0.0" .Values.keycloak.image.tag) }}
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+          {{- else }}
+          # Keycloak <22 uses HTTP port for health checks
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.keycloak.port }}
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+          {{- end }}
+          {{- if .Values.keycloak.keybound.enabled }}
+          volumeMounts:
+            - name: keycloak-providers
+              mountPath: /opt/keycloak/providers
+          {{- end }}
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+      {{- if .Values.keycloak.keybound.enabled }}
+      volumes:
+        - name: keycloak-providers
+          emptyDir: {}
+      {{- end }}
+{{- end }}
