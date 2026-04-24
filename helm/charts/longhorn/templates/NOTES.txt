@@ -1,0 +1,71 @@
+================================================================================
+  Longhorn Distributed Block Storage - Post-Install Notes
+================================================================================
+
+Longhorn has been deployed to namespace: {{ .Release.Namespace }}
+
+The default storage class "longhorn" has been created.
+
+================================================================================
+  Getting Started
+================================================================================
+
+1. Verify Longhorn is running:
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name=longhorn
+
+2. Check the storage class:
+   kubectl get storageclass
+
+3. Create a PVC using Longhorn:
+   kubectl apply -f - <<EOF
+   apiVersion: v1
+   kind: PersistentVolumeClaim
+   metadata:
+     name: test-pvc
+   spec:
+     accessModes:
+       - ReadWriteOnce
+     storageClassName: longhorn
+     resources:
+       requests:
+         storage: 1Gi
+   EOF
+
+4. Access the Longhorn UI (optional):
+   # Port-forward to the UI
+   kubectl port-forward -n {{ .Release.Namespace }} svc/longhorn-frontend 8080:80
+
+   # Then open http://localhost:8080 in your browser
+
+================================================================================
+  Configuration Notes
+================================================================================
+
+- Default replica count: {{ .Values.longhorn.defaultSettings.defaultReplicaCount }}
+- Default filesystem: {{ .Values.longhorn.persistence.defaultFsType }}
+- Storage class: longhorn
+
+For production:
+- Increase replica count to 3 for high availability
+- Configure backup target (S3/NFS) for disaster recovery
+- Set appropriate resource limits
+
+================================================================================
+  Using with PostgreSQL and MinIO
+================================================================================
+
+To use Longhorn with the data-store chart:
+
+helm install data-store ./helm/charts/data-store \
+  --set postgres.persistence.storageClass=longhorn \
+  --set minio.persistence.storageClass=longhorn
+
+================================================================================
+  Important Notes
+================================================================================
+
+- Longhorn requires nodes with available local storage
+- Each volume replica consumes storage on the node
+- For cloud deployments (AKS, GKE, EKS), consider using provider storage instead
+
+Documentation: https://longhorn.io/docs/

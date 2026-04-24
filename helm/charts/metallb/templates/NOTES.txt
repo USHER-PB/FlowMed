@@ -1,0 +1,48 @@
+{{- if .Values.enabled }}
+MetalLB has been deployed to your cluster.
+
+{{- if eq (include "metallb.ipPoolEnabled" .) "true" }}
+
+IP Address Pools configured:
+{{- range $name, $pool := .Values.ipAddressPools }}
+{{- if $pool.enabled }}
+  - {{ $name }}: {{ join ", " $pool.addresses }}
+{{- end }}
+{{- end }}
+
+{{- end }}
+
+{{- if eq (include "metallb.l2AdvertisementEnabled" .) "true" }}
+
+L2 Advertisement enabled (ARP/NDP mode)
+Services will be announced via ARP/NDP on your network.
+
+{{- end }}
+
+{{- if eq (include "metallb.bgpEnabled" .) "true" }}
+
+BGP Advertisement enabled
+Services will be announced via BGP to configured peers.
+
+{{- end }}
+
+Usage:
+  1. Create a service with type: LoadBalancer
+  2. MetalLB will assign an IP from the configured pool
+  3. The IP will be announced via L2 (ARP) or BGP
+
+Example:
+  kubectl get svc -A | grep LoadBalancer
+
+Verify MetalLB is working:
+  kubectl get pods -n {{ include "metallb.namespace" . }}
+  kubectl get ipaddresspools -n {{ include "metallb.namespace" . }}
+  kubectl get l2advertisements -n {{ include "metallb.namespace" . }}
+
+{{- if .Values.monitoring.enabled }}
+
+Monitoring enabled:
+  Prometheus metrics available on port 7472
+{{- end }}
+
+{{- end }}
