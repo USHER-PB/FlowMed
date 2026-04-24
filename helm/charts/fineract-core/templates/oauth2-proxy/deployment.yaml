@@ -18,6 +18,8 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.oauth2Proxy.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "fineract-core.oauth2Proxy.selectorLabels" . | nindent 6 }}
@@ -40,38 +42,61 @@ spec:
           image: {{ include "fineract-core.oauth2ProxyImage" . }}
           imagePullPolicy: {{ .Values.oauth2Proxy.image.pullPolicy }}
           args:
-            - --provider=oidc
-            - --oidc-issuer-url={{ .Values.oauth2Proxy.keycloak.url }}/realms/{{ .Values.oauth2Proxy.keycloak.realm }}
-            - --redirect-url={{ .Values.oauth2Proxy.redirectUrl }}
-            - --upstream=http://{{ include "fineract-core.fullname" . }}-gateway:80
-            - --email-domain=*
-            - --skip-provider-button=true
+            - --config=/etc/oauth2-proxy/oauth2_proxy.cfg
+          volumeMounts:
+            - name: config
+              mountPath: /etc/oauth2-proxy
+              readOnly: true
           env:
+            {{- if .Values.secrets.oauth2Proxy.clientIdKey }}
             - name: OAUTH2_PROXY_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.oauth2Proxy.secretName }}
-                  key: clientId
+                  key: {{ .Values.secrets.oauth2Proxy.clientIdKey }}
+            {{- end }}
             - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.oauth2Proxy.secretName }}
-                  key: clientSecret
+                  key: {{ .Values.secrets.oauth2Proxy.clientSecretKey | default "clientSecret" }}
+            {{- if .Values.secrets.oauth2Proxy.cookieSecretKey }}
             - name: OAUTH2_PROXY_COOKIE_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.oauth2Proxy.secretName }}
-                  key: cookieSecret
+                  key: {{ .Values.secrets.oauth2Proxy.cookieSecretKey }}
+            {{- else if .Values.oauth2Proxy.cookieSecret }}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              value: {{ .Values.oauth2Proxy.cookieSecret | quote }}
+            {{- end }}
+            {{- if .Values.oauth2Proxy.redis.enabled }}
+            - name: OAUTH2_PROXY_REDIS_CONNECTION_URL
+              value: {{ .Values.oauth2Proxy.redis.connectionUrl | quote }}
+            {{- if .Values.oauth2Proxy.redis.existingSecret }}
+            - name: OAUTH2_PROXY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.oauth2Proxy.redis.existingSecret }}
+                  key: {{ .Values.oauth2Proxy.redis.secretKey | default "password" }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 4180
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: http
+            failureThreshold: 12
+            periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /ping
               port: http
             initialDelaySeconds: 10
-            periodSeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
@@ -79,8 +104,8 @@ spec:
               path: /ping
               port: http
             initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
           resources:
             requests:
@@ -89,6 +114,10 @@ spec:
             limits:
               cpu: {{ .Values.oauth2Proxy.resources.limits.cpu }}
               memory: {{ .Values.oauth2Proxy.resources.limits.memory }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "fineract-core.fullname" . }}-oauth2-proxy-config
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

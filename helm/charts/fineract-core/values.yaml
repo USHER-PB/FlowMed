@@ -80,7 +80,10 @@ fineract:
 database:
   host: postgresql-primary.database.svc.cluster.local
   port: 5432
-  name: fineract
+  # Tenant store database - for managing tenant connections
+  tenantStoreName: fineract_tenants
+  # Default tenant database - for application data
+  tenantName: fineract_default
   username: fineract
   # Password should be set via secrets.database.password
   connectionPool:

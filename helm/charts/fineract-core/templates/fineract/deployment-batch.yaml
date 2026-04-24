@@ -18,6 +18,8 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.fineract.batch.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "fineract-core.batch.selectorLabels" . | nindent 6 }}
@@ -43,6 +45,12 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: management
+              containerPort: 9090
+              protocol: TCP
           env:
             # Fineract instance mode
             - name: FINERACT_NODE_ID
@@ -51,53 +59,88 @@ spec:
                   fieldPath: metadata.name
             - name: FINERACT_MODE_BATCH_ENABLED
               value: "true"
-            # PostgreSQL connection
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
-            - name: SPRING_DATASOURCE_USERNAME
+            # Management port for health checks and metrics
+            - name: MANAGEMENT_SERVER_PORT
+              value: "9090"
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            # PostgreSQL connection - using FINERACT_HIKARI_* variables
+            # Tenant Store Database - for managing tenant connections
+            - name: FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME
+              value: "org.postgresql.Driver"
+            - name: FINERACT_HIKARI_JDBC_URL
+              value: "jdbc:postgresql://{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.tenantStoreName }}"
+            - name: FINERACT_HIKARI_USERNAME
               value: {{ .Values.database.username | quote }}
-            - name: SPRING_DATASOURCE_PASSWORD
+            - name: FINERACT_HIKARI_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.database.secretName }}
                   key: password
             # Connection pool settings
-            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+            - name: FINERACT_HIKARI_MAXIMUM_POOL_SIZE
               value: {{ .Values.database.connectionPool.maxPoolSize | quote }}
-            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+            - name: FINERACT_HIKARI_MINIMUM_IDLE
               value: {{ .Values.database.connectionPool.minIdle | quote }}
-            - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+            - name: FINERACT_HIKARI_CONNECTION_TIMEOUT
               value: {{ .Values.database.connectionPool.connectionTimeout | quote }}
+            - name: FINERACT_HIKARI_IDLE_TIMEOUT
+              value: "60000"
+            - name: FINERACT_HIKARI_MAX_LIFETIME
+              value: "1800000"
+            - name: FINERACT_HIKARI_LEAK_DETECTION_THRESHOLD
+              value: "30000"
+            - name: FINERACT_HIKARI_CONNECTION_TEST_QUERY
+              value: "SELECT 1"
+            # Default Tenant Database - for application data
+            - name: FINERACT_DEFAULT_TENANTDB_HOSTNAME
+              value: {{ .Values.database.host | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_IDENTIFIER
+              value: "default"
+            - name: FINERACT_DEFAULT_TENANTDB_NAME
+              value: {{ .Values.database.tenantName | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_UID
+              value: {{ .Values.database.username | quote }}
+            - name: FINERACT_DEFAULT_TENANTDB_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: password
             # Redis connection
-            - name: SPRING_REDIS_HOST
+            - name: FINERACT_REDIS_HOST
               value: {{ .Values.redis.host | quote }}
-            - name: SPRING_REDIS_PORT
+            - name: FINERACT_REDIS_PORT
               value: {{ .Values.redis.port | quote }}
-            - name: SPRING_REDIS_DATABASE
+            - name: FINERACT_REDIS_DATABASE
               value: {{ .Values.redis.database | quote }}
           livenessProbe:
             httpGet:
-              path: /fineract-provider/actuator/health
-              port: http
+              path: /actuator/health/liveness
+              port: management
             initialDelaySeconds: 60
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 10
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /fineract-provider/actuator/health
-              port: http
+              path: /actuator/health/readiness
+              port: management
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           startupProbe:
             httpGet:
-              path: /fineract-provider/actuator/health
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            failureThreshold: 30
+              path: /actuator/health
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 40
           resources:
             requests:
               cpu: {{ .Values.fineract.batch.resources.requests.cpu }}

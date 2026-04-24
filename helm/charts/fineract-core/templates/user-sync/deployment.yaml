@@ -18,6 +18,8 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.userSync.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "fineract-core.userSync.selectorLabels" . | nindent 6 }}
@@ -41,8 +43,11 @@ spec:
           imagePullPolicy: {{ .Values.userSync.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 8081
+              containerPort: {{ .Values.userSync.port | default 5000 }}
               protocol: TCP
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             # Keycloak connection
             - name: KEYCLOAK_URL
@@ -50,47 +55,43 @@ spec:
             - name: KEYCLOAK_REALM
               value: {{ .Values.userSync.keycloak.realm | quote }}
             - name: KEYCLOAK_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.keycloak.secretName }}
-                  key: clientId
+              value: {{ .Values.userSync.keycloak.clientId | default "user-sync" | quote }}
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.keycloak.secretName }}
-                  key: clientSecret
+                  key: {{ .Values.secrets.keycloak.clientSecretKey | default "keycloak-client-secret" }}
             # Fineract API connection
             - name: FINERACT_API_URL
               value: "http://{{ include "fineract-core.fullname" . }}-write:8080"
             - name: FINERACT_API_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: username
+              value: {{ .Values.fineract.api.username | default "mifos" | quote }}
             - name: FINERACT_API_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: password
+              value: {{ .Values.fineract.api.password | default "password" | quote }}
             # Sync configuration
             - name: SYNC_INTERVAL_SECONDS
               value: {{ .Values.userSync.syncIntervalSeconds | quote }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            timeoutSeconds: 5
+            failureThreshold: 12
+            periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /health
               port: http
+            timeoutSeconds: 5
             initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
+            periodSeconds: 15
           resources:
             requests:
               cpu: {{ .Values.userSync.resources.requests.cpu }}
@@ -98,6 +99,11 @@ spec:
             limits:
               cpu: {{ .Values.userSync.resources.limits.cpu }}
               memory: {{ .Values.userSync.resources.limits.memory }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

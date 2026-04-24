@@ -38,18 +38,26 @@ spec:
           imagePullPolicy: {{ .Values.configCli.image.pullPolicy }}
           env:
             # Fineract API connection
-            - name: FINERACT_API_URL
-              value: "http://{{ include "fineract-core.fullname" . }}-write:8080"
-            - name: FINERACT_API_USERNAME
+            - name: FINERACT_BASE_URL
+              value: "http://{{ include "fineract-core.fullname" . }}-write:8080/fineract-provider"
+            - name: FINERACT_TENANT
+              value: "default"
+            - name: FINERACT_SSL_VERIFY
+              value: "false"
+            # OAuth2 authentication
+            - name: FINERACT_AUTH_TYPE
+              value: "oauth2"
+            - name: FINERACT_AUTH_OAUTH2_TOKEN_URL
+              value: {{ .Values.configCli.auth.tokenUrl | default "http://keycloak:8080/realms/fineract/protocol/openid-connect/token" | quote }}
+            - name: FINERACT_AUTH_OAUTH2_CLIENT_ID
+              value: {{ .Values.configCli.auth.clientId | default "fineract-config" | quote }}
+            - name: FINERACT_AUTH_OAUTH2_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: username
-            - name: FINERACT_API_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: password
+                  key: {{ .Values.secrets.fineractApi.oauth2ClientSecretKey | default "oauth2-client-secret" }}
+            - name: FINERACT_AUTH_OAUTH2_GRANT_TYPE
+              value: "client_credentials"
             # Config data path
             - name: CONFIG_DATA_PATH
               value: "/config/bootstrap.json"

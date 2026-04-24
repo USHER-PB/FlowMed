@@ -35,7 +35,11 @@ spec:
             pathType: Prefix
             backend:
               service:
+                {{- if .Values.oauth2Proxy.enabled }}
+                name: {{ include "fineract-core.fullname" . }}-oauth2-proxy
+                {{- else }}
                 name: {{ include "fineract-core.fullname" . }}-gateway
+                {{- end }}
                 port:
-                  number: 80
+                  number: 4180
 {{- end }}
