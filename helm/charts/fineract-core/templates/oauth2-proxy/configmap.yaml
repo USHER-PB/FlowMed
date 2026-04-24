@@ -1,0 +1,97 @@
+{{/*
+ =============================================================================
+ OAuth2-Proxy ConfigMap
+ =============================================================================
+ Validates: Requirements 5.1, 5.2, 5.3
+ =============================================================================
+ */}}
+{{- if .Values.oauth2Proxy.enabled -}}
+{{- $externalHost := regexReplaceAll ":[0-9]+$" (urlParse .Values.oauth2Proxy.redirectUrl).host "" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-oauth2-proxy-config
+  labels:
+    {{- include "fineract-core.oauth2Proxy.labels" . | nindent 4 }}
+  {{- with (include "fineract-core.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+data:
+  oauth2_proxy.cfg: |
+    # OAuth2 Proxy Configuration
+    # Use generic "oidc" provider (not "keycloak-oidc") to avoid the "role:" prefix
+    # on groups. The keycloak-oidc provider prepends "role:" to all realm roles.
+    provider = "oidc"
+    client_id = "{{ .Values.oauth2Proxy.keycloak.clientId }}"
+    # client_secret is injected via OAUTH2_PROXY_CLIENT_SECRET env var from the Secret
+    # Issuer URL — must match 'iss' claim in tokens (public-facing KC URL)
+    oidc_issuer_url = "{{ .Values.oauth2Proxy.keycloak.issuerUrl | default (printf "%s/realms/%s" .Values.oauth2Proxy.keycloak.url .Values.oauth2Proxy.keycloak.realm) }}"
+    # Skip OIDC discovery because KC returns public URLs in discovery response,
+    # which are unreachable from inside the cluster. Set all endpoints explicitly.
+    skip_oidc_discovery = true
+    # Browser-facing login URL (public KC)
+    login_url = "{{ .Values.oauth2Proxy.keycloak.issuerUrl | default (printf "%s/realms/%s" .Values.oauth2Proxy.keycloak.url .Values.oauth2Proxy.keycloak.realm) }}/protocol/openid-connect/auth"
+    # Token redemption uses internal KC URL (reachable from pod network)
+    redeem_url = "{{ .Values.oauth2Proxy.keycloak.url }}/realms/{{ .Values.oauth2Proxy.keycloak.realm }}/protocol/openid-connect/token"
+    # Profile URL (internal)
+    profile_url = "{{ .Values.oauth2Proxy.keycloak.url }}/realms/{{ .Values.oauth2Proxy.keycloak.realm }}/protocol/openid-connect/userinfo"
+    # JWKS URL for token validation (internal)
+    oidc_jwks_url = "{{ .Values.oauth2Proxy.keycloak.jwksUrl | default (printf "%s/realms/%s/protocol/openid-connect/certs" .Values.oauth2Proxy.keycloak.url .Values.oauth2Proxy.keycloak.realm) }}"
+    # Skip issuer verification — needed when iss URL uses HTTP or untrusted certs
+    {{- if not (.Values.oauth2Proxy.oidcVerifyIssuer | default false) }}
+    insecure_oidc_skip_issuer_verification = true
+    {{- end }}
+    # Read roles from the nested realm_access.roles claim in the ID token
+    oidc_groups_claim = "realm_access.roles"
+
+    http_address = "0.0.0.0:4180"
+
+    # Redirect URL (must match what browser sees)
+    redirect_url = "{{ .Values.oauth2Proxy.redirectUrl }}"
+
+    # Cookie
+    cookie_secure = {{ .Values.oauth2Proxy.cookieSecure | default false }}
+    cookie_httponly = true
+    cookie_samesite = "{{ .Values.oauth2Proxy.cookieSameSite | default "lax" }}"
+    cookie_name = "_oauth2_proxy"
+    cookie_expire = "{{ .Values.oauth2Proxy.cookieExpire | default "168h" }}"
+    cookie_refresh = "{{ .Values.oauth2Proxy.cookieRefresh | default "10m" }}"
+    {{- if and (ne $externalHost "localhost") (not (regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$" $externalHost)) (not (regexMatch "\\.nip\\.io$" $externalHost)) }}
+    cookie_domains = ["{{ $externalHost }}"]
+    {{- end }}
+
+    # Session storage - Redis
+    {{- if .Values.oauth2Proxy.redis.enabled }}
+    session_store_type = "redis"
+    {{- end }}
+
+    # Email domain
+    email_domains = ["*"]
+
+    # Skip provider button
+    skip_provider_button = true
+
+    # Pass auth headers
+    set_xauthrequest = true
+    set_authorization_header = true
+    pass_access_token = true
+    pass_authorization_header = true
+
+    # Upstream
+    upstreams = ["http://{{ include "fineract-core.fullname" . }}-gateway:80"]
+
+    # Scope
+    scope = "openid email profile"
+
+    # Skip auth for these paths
+    skip_auth_routes = [
+      "^/health",
+      "^/healthz",
+      "^/ready",
+      "^/ping"
+    ]
+
+    # Silence ping logging
+    silence_ping_logging = true
+{{- end }}

@@ -1,0 +1,303 @@
+# =============================================================================
+# Fineract Core Helm Chart - Local Development Values
+# =============================================================================
+# This values file is configured for local deployment with:
+# - No TLS (disabled for local development)
+# - component.local domain for ingress
+# - Connection to existing dependencies in the fineract namespace
+# =============================================================================
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+global:
+  domain: fineract.local
+  environment: development
+
+# =============================================================================
+# Fineract Instances Configuration
+# =============================================================================
+
+fineract:
+  image:
+    repository: ghcr.io/adorsys-gis/fineract
+    tag: "586bd68f9"
+    pullPolicy: IfNotPresent
+
+  # Read instance - optimized for query operations
+  read:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    autoscaling:
+      enabled: false
+
+  # Write instance - handles transaction operations
+  write:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    autoscaling:
+      enabled: false
+
+  # Batch instance - processes scheduled jobs
+  batch:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  # API credentials (used by user-sync and config-cli)
+  api:
+    username: mifos
+    password: password
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+
+database:
+  # Connect to existing PostgreSQL in fineract namespace
+  host: data-store-postgres-rw.fineract.svc.cluster.local
+  port: 5432
+  # Tenant store database - for managing tenant connections
+  tenantStoreName: fineract_tenants
+  # Default tenant database - for application data
+  tenantName: fineract_default
+  username: appuser
+  # Password will be sourced from the secret
+  connectionPool:
+    maxPoolSize: 10
+    minIdle: 2
+    connectionTimeout: 30000
+
+# =============================================================================
+# Redis Configuration
+# =============================================================================
+
+redis:
+  # Connect to existing Redis in fineract namespace
+  host: infra-cache-redis.fineract.svc.cluster.local
+  port: 6379
+  database: 0
+
+# =============================================================================
+# NGINX Gateway Configuration
+# =============================================================================
+
+gateway:
+  enabled: true
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    className: nginx
+    hostname: api.fineract.local
+    # Disable TLS for local deployment
+    annotations:
+      # No cert-manager annotations for local
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    tls:
+      enabled: false
+      secretName: ""
+
+# =============================================================================
+# OAuth2 Proxy Configuration
+# =============================================================================
+
+oauth2Proxy:
+  enabled: true
+  image:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: "v7.5.1"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Cookie secret for session encryption (used when not in secret)
+  cookieSecret: "9961a4c53b583afb7e31e9c3e5ef0c83"
+  keycloak:
+    # Connect to existing Keycloak in fineract namespace
+    url: http://keycloak.fineract.svc.cluster.local:8080
+    # Use the frontend URL as issuer (matches Keycloak's configured frontend URL)
+    issuerUrl: http://auth.fineract.local/realms/fineract
+    realm: fineract
+    # Client ID must match the client configured in Keycloak
+    clientId: oauth2-proxy
+    # Skip OIDC discovery since issuer URL differs from internal URL
+    skipDiscovery: true
+    # JWKS URL for token verification (internal URL)
+    jwksUrl: http://keycloak.fineract.svc.cluster.local:8080/realms/fineract/protocol/openid-connect/certs
+  # Local redirect URL (no TLS)
+  redirectUrl: http://api.fineract.local/oauth2/callback
+  # Disable cookie secure for local HTTP deployment
+  cookieSecure: false
+  # Skip issuer verification for HTTP (no TLS)
+  oidcVerifyIssuer: false
+  # Redis session storage
+  redis:
+    enabled: true
+    connectionUrl: redis://infra-cache-redis.fineract.svc.cluster.local:6379/1
+    existingSecret: infra-cache-redis-auth
+    secretKey: redis-password
+
+# =============================================================================
+# User Sync Service Configuration
+# =============================================================================
+
+userSync:
+  enabled: true
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/user-sync-service
+    tag: "169deecc"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  # Port must match the gunicorn listening port (5000)
+  port: 5000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  syncIntervalSeconds: 300
+  # Keycloak connection settings for user synchronization
+  keycloak:
+    url: http://keycloak.fineract.svc.cluster.local:8080
+    realm: fineract
+    # Client ID for user-sync service (set directly, not from secret)
+    clientId: user-sync-service
+
+# =============================================================================
+# Config CLI Job Configuration
+# =============================================================================
+
+configCli:
+  enabled: true
+  image:
+    repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
+    tag: "develop-032d192"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  # OAuth2 authentication for Fineract API
+  auth:
+    # Token URL uses internal Keycloak service (cluster-local)
+    tokenUrl: "http://keycloak:8080/realms/fineract/protocol/openid-connect/token"
+    clientId: "fineract-config"
+  bootstrapData:
+    tenants: []
+    users: []
+    roles: []
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+
+secrets:
+  database:
+    # Do not create - reference existing database secret
+    create: false
+    # Reference the existing postgres secret created by data-store chart
+    secretName: data-store-postgres
+    password: ""
+  keycloak:
+    # Reference the existing user-sync-credentials secret
+    secretName: user-sync-credentials
+    # Key mappings for existing secret keys (only clientSecret is available)
+    clientSecretKey: keycloak-client-secret
+  oauth2Proxy:
+    # Reference the existing oauth2-proxy-secrets secret
+    secretName: oauth2-proxy-secrets
+    # Key mappings for existing secret keys (only clientSecret is available)
+    # clientId is set in configmap, cookieSecret is set via value below
+    clientSecretKey: client-secret
+  fineractApi:
+    # Reference the existing fineract-config-credentials secret
+    secretName: fineract-config-credentials
+    # Key mappings for existing secret keys (oauth2-client-secret is available)
+    oauth2ClientSecretKey: oauth2-client-secret
+
+# =============================================================================
+# Service Account Configuration
+# =============================================================================
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# =============================================================================
+# Image Pull Secrets
+# =============================================================================
+
+imagePullSecrets: []
+
+# =============================================================================
+# Pod Security Context - Relaxed for local development
+# =============================================================================
+
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  runAsGroup: 0
+  fsGroup: 0
+
+securityContext:
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: []
+
+# =============================================================================
+# Common Labels and Annotations
+# =============================================================================
+
+commonLabels:
+  environment: development
+  deployment-type: local
+
+commonAnnotations:
+  description: "Fineract Core local development deployment"
