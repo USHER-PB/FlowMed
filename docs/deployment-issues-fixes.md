@@ -220,12 +220,91 @@ All secrets are managed via SealedSecrets, ensuring the deployment is fully auto
 
 ---
 
+## Automation with Helm Hooks
+
+The deployment now includes automated initialization using Helm hooks:
+
+### Hook Execution Order
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Helm Install/Upgrade                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. database-init (weight: -10)                             │
+│     - Waits for PostgreSQL                                   │
+│     - Creates fineract_tenants database                      │
+│     - Creates fineract_default database                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. keycloak-init (weight: -5)                               │
+│     - Waits for Keycloak                                     │
+│     - Creates 'fineract' realm                               │
+│     - Creates 'user-sync-service' client                     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. Main Resources                                           │
+│     - Deployments (write, read, batch)                       │
+│     - Gateway, OAuth2 Proxy, User-Sync                       │
+│     - Services, Ingress, ConfigMaps                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Configuration
+
+Enable/disable automation in values file:
+
+```yaml
+databaseInit:
+  enabled: true  # Auto-create databases
+  image:
+    repository: postgres
+    tag: "15-alpine"
+
+keycloakInit:
+  enabled: true  # Auto-create realm and client
+  image:
+    repository: curlimages/curl
+    tag: "8.5.0"
+  url: http://keycloak-service.fineract.svc.cluster.local:8080
+  realm: fineract
+```
+
+### Prerequisites for Clean Environment
+
+| Component | Requirement | Automated? |
+|-----------|-------------|------------|
+| Kubernetes cluster | With Sealed Secrets controller | Manual |
+| PostgreSQL instance | Running and accessible | Manual |
+| Keycloak instance | Running and accessible | Manual |
+| Redis instance | Running and accessible | Manual |
+| SealedSecrets | Applied to cluster | Manual |
+| Databases | fineract_tenants, fineract_default | **Automated** |
+| Keycloak realm | 'fineract' realm with client | **Automated** |
+
+### Deployment Command
+
+```bash
+helm upgrade --install fineract-core ./helm/charts/fineract-core \
+  -n fineract \
+  -f helm/values/dev/fineract-core-values.yaml
+```
+
+---
+
 ## Lessons Learned
 
 1. **YAML duplicate keys** are silently overwritten - use `yamllint` to catch these errors
 2. **Helm template debugging** - use `helm template --debug` to verify rendered output
 3. **Health probe schemes** must match the server protocol (HTTP vs HTTPS)
-4. **Database initialization** should be automated for reproducible deployments
+4. **Database initialization** should be automated for reproducible deployments - now implemented with Helm hooks
 5. **Always reference working implementations** - the `~/Projects/fineract-gitops` folder was invaluable for comparison
 6. **Memory requirements** - Fineract requires at least 2Gi memory for reliable startup; ClassGraph scanning is memory-intensive
 7. **Sealed Secrets** - Using SealedSecrets ensures secure, automated secret management for reproducible deployments
+8. **Helm hooks** - Use pre-install hooks for dependency initialization to ensure clean environment deployments work automatically
