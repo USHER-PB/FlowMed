@@ -1,0 +1,312 @@
+# =============================================================================
+# Fineract UI Stack Helm Chart - Local Development Values
+# =============================================================================
+# This values file is configured for local deployment with:
+# - No TLS (disabled for local development)
+# - fineract.local domain for ingress
+# - Connection to existing fineract-core services in the same namespace
+# =============================================================================
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+global:
+  domain: fineract.local
+  apiEndpoint: http://api.fineract.local
+  keycloak:
+    url: http://auth.fineract.local
+    realm: fineract
+  # Docker registry credentials for ghcr.io
+  imagePullSecrets:
+    - name: ghcr-credentials
+
+# =============================================================================
+# Common UI Configuration
+# =============================================================================
+
+ui:
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  replicaCount: 1
+
+# =============================================================================
+# Portal Application
+# =============================================================================
+
+portal:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: nginx
+    tag: "1.28.2-alpine"
+    pullPolicy: IfNotPresent
+  hostname: portal.fineract.local
+  keycloak:
+    clientId: fineract-portal
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Web App Application (Disabled by default)
+# =============================================================================
+
+webApp:
+  enabled: false
+  image:
+    repository: fineract/web-app-ui
+    tag: "1.0.0"
+  hostname: app.fineract.local
+  keycloak:
+    clientId: fineract-web-app
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Admin Application
+# =============================================================================
+
+admin:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/admin-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: admin.fineract.local
+  keycloak:
+    clientId: fineract-admin
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Self-Service Application (Disabled by default)
+# =============================================================================
+
+selfService:
+  enabled: false
+  image:
+    repository: fineract/self-service-ui
+    tag: "1.0.0"
+  hostname: selfservice.fineract.local
+  keycloak:
+    clientId: fineract-self-service
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Account Management Application
+# =============================================================================
+
+accountManagement:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/account-manager-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: accounts.fineract.local
+  keycloak:
+    clientId: fineract-account-management
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Accounting Application
+# =============================================================================
+
+accounting:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/accounting-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: accounting.fineract.local
+  keycloak:
+    clientId: fineract-accounting
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Reporting Application
+# =============================================================================
+
+reporting:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/reporting-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: reports.fineract.local
+  keycloak:
+    clientId: fineract-reporting
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Branch Application
+# =============================================================================
+
+branch:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/branch-manager-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: branch.fineract.local
+  keycloak:
+    clientId: fineract-branch
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Cashier Application
+# =============================================================================
+
+cashier:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/cashier-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: cashier.fineract.local
+  keycloak:
+    clientId: fineract-cashier
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""
+
+# =============================================================================
+# Asset Application
+# =============================================================================
+
+asset:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/adorsys-gis/fineract-apps/asset-manager-app
+    tag: "cac454a9"
+    pullPolicy: Always
+  hostname: assets.fineract.local
+  keycloak:
+    clientId: fineract-asset
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    clusterIssuer: ""
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+    secretName: ""

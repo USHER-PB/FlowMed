@@ -424,3 +424,376 @@ helm upgrade --install fineract-core ./helm/charts/fineract-core \
 11. **Init container images need required tools** - Ensure the image has all necessary binaries (curl, jq, etc.); `nicolaka/netshoot` is a good debugging image
 12. **Secret references must match actual storage** - Different components may store credentials in different secrets; verify which secret contains which key
 13. **Resource constraints in dev clusters** - Reduce CPU/memory requests for non-critical workloads to allow scheduling on resource-constrained clusters
+
+---
+
+# Wave 7: Fineract UI Stack Deployment Issues
+
+## Issue 14: ConfigMap redirectUri Hardcoded HTTPS
+
+### Problem
+All 8 UI application ConfigMaps had hardcoded HTTPS in the `redirectUri` field:
+```json
+"redirectUri": "https://{{ .Values.admin.hostname }}"
+```
+
+This caused authentication failures in local development environments that use HTTP.
+
+### Solution
+Modified all ConfigMap templates to conditionally use HTTP/HTTPS based on `tls.enabled`:
+
+**Files Modified:**
+- `helm/charts/fineract-ui-stack/templates/admin/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/portal/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/accounting/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/account-management/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/reporting/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/branch/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/cashier/configmap.yaml`
+- `helm/charts/fineract-ui-stack/templates/asset/configmap.yaml`
+
+**Fix Applied:**
+```yaml
+"redirectUri": "{{ if .Values.admin.tls.enabled }}https://{{ else }}http://{{ end }}{{ .Values.admin.hostname }}"
+```
+
+---
+
+## Issue 15: Ingress TLS Hardcoded
+
+### Problem
+All 8 Ingress templates had hardcoded TLS sections and cert-manager annotations, causing issues in local development without cert-manager or TLS certificates.
+
+### Solution
+Modified all Ingress templates to conditionally include TLS and cert-manager annotations based on `tls.enabled`.
+
+**Files Modified:**
+- `helm/charts/fineract-ui-stack/templates/admin/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/portal/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/accounting/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/account-management/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/reporting/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/branch/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/cashier/ingress.yaml`
+- `helm/charts/fineract-ui-stack/templates/asset/ingress.yaml`
+
+**Fix Applied:**
+```yaml
+metadata:
+  annotations:
+    {{- if and .Values.admin.tls.enabled .Values.admin.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.admin.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.admin.ingress.annotations }}
+    {{- toYaml .Values.admin.ingress.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.admin.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.admin.hostname }}
+      secretName: {{ .Values.admin.tls.secretName }}
+  {{- end }}
+```
+
+---
+
+## Issue 16: Missing imagePullSecrets for Private Registry
+
+### Problem
+UI application images are hosted on `ghcr.io` (GitHub Container Registry) which requires authentication. The deployment templates didn't include `imagePullSecrets`, causing `ImagePullBackOff` errors with `403 Forbidden`.
+
+### Solution
+1. Created a docker-registry secret with the registry credentials:
+```bash
+kubectl create secret docker-registry ghcr-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=adorsys-gis \
+  --docker-password=<token> \
+  -n fineract
+```
+
+2. Added `imagePullSecrets` support to all deployment templates:
+
+**Files Modified:**
+- `helm/charts/fineract-ui-stack/templates/admin/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/portal/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/accounting/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/account-management/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/reporting/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/branch/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/cashier/deployment.yaml`
+- `helm/charts/fineract-ui-stack/templates/asset/deployment.yaml`
+
+**Fix Applied:**
+```yaml
+spec:
+  {{- if .Values.global.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+  {{- end }}
+  containers:
+```
+
+3. Added `global.imagePullSecrets` to values file:
+```yaml
+global:
+  imagePullSecrets:
+    - name: ghcr-credentials
+```
+
+---
+
+## Issue 17: Incorrect Image Names and Tags
+
+### Problem
+The values file referenced images that didn't exist in the registry:
+- `ghcr.io/adorsys-gis/fineract-accounting-app:fix-api-v1` - not found
+- `ghcr.io/adorsys-gis/fineract-reporting-app:fix-api-v1` - not found
+- Various apps using `:latest` tag which didn't exist
+
+### Solution
+Referenced the working implementation in `~/Projects/fineract-gitops/charts/fineract-frontends/values.yaml` to get correct image names and tags:
+
+| App | Correct Image | Tag |
+|-----|---------------|-----|
+| admin | `ghcr.io/adorsys-gis/fineract-apps/admin-app` | `cac454a9` |
+| account-management | `ghcr.io/adorsys-gis/fineract-apps/account-manager-app` | `cac454a9` |
+| accounting | `ghcr.io/adorsys-gis/fineract-apps/accounting-app` | `cac454a9` |
+| reporting | `ghcr.io/adorsys-gis/fineract-apps/reporting-app` | `cac454a9` |
+| branch | `ghcr.io/adorsys-gis/fineract-apps/branch-manager-app` | `cac454a9` |
+| cashier | `ghcr.io/adorsys-gis/fineract-apps/cashier-app` | `cac454a9` |
+| asset | `ghcr.io/adorsys-gis/fineract-apps/asset-manager-app` | `cac454a9` |
+| portal | `nginx` | `1.27.3-alpine` (public image) |
+
+---
+
+## Issue 18: Deployment Strategy - RollingUpdate vs Recreate
+
+### Problem
+With the default `RollingUpdate` strategy, old ReplicaSets with incorrect configurations were still creating pods alongside new ones, causing confusion and resource waste.
+
+### Solution
+Added `Recreate` deployment strategy to all UI deployments to ensure clean rollouts:
+
+```yaml
+spec:
+  replicas: {{ .Values.admin.replicaCount | default .Values.ui.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+```
+
+**Note:** Recreate strategy causes brief downtime during deployments but ensures clean state. For production environments with multiple replicas, RollingUpdate with proper probe configuration is recommended.
+
+---
+
+## Summary of Wave 7 Files Modified
+
+| File | Changes |
+|------|---------|
+| `helm/values/dev/fineract-ui-stack-values.yaml` | Created new values file for local dev |
+| `helm/charts/fineract-ui-stack/templates/*/configmap.yaml` (8 files) | Conditional HTTP/HTTPS redirectUri |
+| `helm/charts/fineract-ui-stack/templates/*/ingress.yaml` (8 files) | Conditional TLS and cert-manager annotations |
+| `helm/charts/fineract-ui-stack/templates/*/deployment.yaml` (8 files) | imagePullSecrets support, Recreate strategy |
+
+---
+
+## Wave 7 Deployment Commands
+
+### Prerequisites
+
+1. **Create registry credentials secret (one-time):**
+```bash
+kubectl create secret docker-registry ghcr-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=<your-github-username> \
+  --docker-password=<your-github-token> \
+  -n fineract
+```
+
+2. **Update /etc/hosts:**
+```bash
+# Get the ingress IP (adjust based on your cluster)
+INGRESS_IP="192.168.1.200"  # Replace with your cluster IP
+
+# Add host entries
+echo "$INGRESS_IP fineract.local auth.fineract.local" | sudo tee -a /etc/hosts
+```
+
+### Deploy Fineract Core (Gateway)
+
+```bash
+# Deploy fineract-core with gateway
+helm upgrade --install fineract-core ./helm/charts/fineract-core \
+  -n fineract \
+  -f helm/values/dev/fineract-core-values.yaml
+```
+
+### Deploy Fineract UI Stack
+
+```bash
+# Deploy UI stack
+helm upgrade --install fineract-ui-stack ./helm/charts/fineract-ui-stack \
+  -n fineract \
+  -f helm/values/dev/fineract-ui-stack-values.yaml
+```
+
+### Verify Deployment
+
+```bash
+# Check pods
+kubectl get pods -n fineract
+
+# Check ingresses
+kubectl get ingress -n fineract
+
+# Check services
+kubectl get svc -n fineract
+```
+
+---
+
+## Wave 7 Access URLs
+
+After adding to `/etc/hosts`:
+```
+192.168.1.200 portal.fineract.local admin.fineract.local accounts.fineract.local accounting.fineract.local reports.fineract.local branch.fineract.local cashier.fineract.local assets.fineract.local
+```
+
+| Application | URL |
+|-------------|-----|
+| Portal | http://portal.fineract.local |
+| Admin | http://admin.fineract.local |
+| Account Management | http://accounts.fineract.local |
+| Accounting | http://accounting.fineract.local |
+| Reporting | http://reports.fineract.local |
+| Branch | http://branch.fineract.local |
+| Cashier | http://cashier.fineract.local |
+| Asset | http://assets.fineract.local |
+
+---
+
+## Lessons Learned (Wave 7)
+
+14. **Conditional TLS configuration** - Always make TLS configurable for local development environments that may not have cert-manager or TLS certificates
+15. **Private registry authentication** - Use `imagePullSecrets` for private registries; create the secret once and reference it in values
+16. **Image naming conventions** - Verify actual image names and tags in the registry; don't assume naming patterns
+17. **Reference working implementations** - The `~/Projects/fineract-gitops` folder provided the correct image names and tags
+18. **Deployment strategy choice** - Use Recreate for dev environments with single replicas; RollingUpdate for production with proper probes
+19. **ConfigMap protocol handling** - OAuth redirect URIs must match the actual protocol (HTTP/HTTPS) used by the application
+
+---
+
+## Issue 13: Portal Not Redirecting to Apps (Wave 7)
+
+### Problem
+The portal landing page was not redirecting to frontend apps when clicked. The portal links used paths like `/administration`, `/cashier`, etc., but each app had its own separate ingress.
+
+### Analysis
+The reference implementation uses a **single gateway** that routes all frontend apps via path-based routing with OAuth2 authentication. The gateway handles:
+- OAuth2-Proxy endpoints (`/oauth2/start`, `/oauth2/`, `/oauth2/auth`)
+- Static assets routing (bypass auth)
+- Frontend apps routing with OAuth2 auth
+- Fineract API routing (preserving read/write/batch functionality)
+- Portal home page routing (public)
+
+### Solution
+Updated the gateway configuration to include frontend app routing:
+
+1. **Created nginx configuration files:**
+   - `helm/charts/fineract-core/files/nginx/gateway.conf` - Main gateway config with path-based routing
+   - `helm/charts/fineract-core/files/nginx/oauth2-auth-cookie.conf` - OAuth2 cookie forwarding
+   - `helm/charts/fineract-core/files/nginx/security-headers.conf` - Security headers for public locations
+
+2. **Updated ConfigMap template** (`helm/charts/fineract-core/templates/gateway/configmap.yaml`):
+   - Uses `.Files.Get` to load nginx config files
+   - Templates variables: `KUBE_DNS_RESOLVER`, `KUBE_NAMESPACE`, `KEYCLOAK_PUBLIC_URL`, `GATEWAY_EXTERNAL_URL_ENCODED`
+
+3. **Updated Deployment template** (`helm/charts/fineract-core/templates/gateway/deployment.yaml`):
+   - Mounts gateway.conf as `/etc/nginx/conf.d/default.conf`
+   - Mounts include files at `/etc/nginx/includes/`
+   - Added nginx-exporter sidecar for Prometheus metrics
+   - Added proper security context
+
+4. **Updated Ingress template** (`helm/charts/fineract-core/templates/gateway/ingress.yaml`):
+   - Routes directly to gateway service on port 80
+   - Gateway handles OAuth2-Proxy routing internally
+
+5. **Updated values files:**
+   - Added `global.keycloakPublicUrl` for logout redirect
+   - Added `gateway.dnsResolver` for kube-dns resolution
+   - Added `gateway.port` and `gateway.hpa` configuration
+   - Added `oauth2Proxy.externalUrl` for OAuth2 redirect URL
+   - Added `oauth2Proxy.cookie` settings for session management
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `helm/charts/fineract-core/files/nginx/gateway.conf` | Created - Complete gateway routing config |
+| `helm/charts/fineract-core/files/nginx/oauth2-auth-cookie.conf` | Created - OAuth2 cookie forwarding |
+| `helm/charts/fineract-core/files/nginx/security-headers.conf` | Created - Security headers |
+| `helm/charts/fineract-core/templates/gateway/configmap.yaml` | Updated to use new nginx files |
+| `helm/charts/fineract-core/templates/gateway/deployment.yaml` | Updated volume mounts, added exporter |
+| `helm/charts/fineract-core/templates/gateway/ingress.yaml` | Updated to route to gateway directly |
+| `helm/values/dev/fineract-core-values.yaml` | Added gateway and OAuth2 proxy config |
+
+### Gateway Routing Configuration
+
+The gateway now handles the following routes:
+
+| Path | Backend | Auth |
+|------|---------|------|
+| `/oauth2/start` | oauth2-proxy:4180 | Public |
+| `/oauth2/` | oauth2-proxy:4180 | Public |
+| `/oauth2/auth` | oauth2-proxy:4180 | Internal |
+| `/cashier/` | fineract-ui-stack-cashier:80 | OAuth2 |
+| `/accounting/` | fineract-ui-stack-accounting:80 | OAuth2 |
+| `/reporting/` | fineract-ui-stack-reporting:80 | OAuth2 |
+| `/administration/` | fineract-ui-stack-admin:80 | OAuth2 |
+| `/account/` | fineract-ui-stack-account-management:80 | OAuth2 |
+| `/branch/` | fineract-ui-stack-branch:80 | OAuth2 |
+| `/asset-manager/` | fineract-ui-stack-asset:80 | OAuth2 |
+| `/fineract-provider/api` | fineract-core-read/write:8080 | OAuth2 |
+| `/home/` | fineract-ui-stack-portal:80 | Public |
+| `/` | Redirect to `/home/` | Public |
+
+### Deployment Commands
+
+```bash
+# Deploy fineract-core with updated gateway
+helm upgrade --install fineract-core ./helm/charts/fineract-core \
+  -n fineract \
+  -f helm/values/dev/fineract-core-values.yaml
+
+# Update /etc/hosts (single entry for gateway)
+echo "192.168.1.200 fineract.local auth.fineract.local" | sudo tee -a /etc/hosts
+```
+
+### Access URLs (After Gateway Update)
+
+| Application | URL |
+|-------------|-----|
+| Portal (Public) | http://fineract.local/home/ |
+| Admin | http://fineract.local/administration/ |
+| Account Management | http://fineract.local/account/ |
+| Accounting | http://fineract.local/accounting/ |
+| Reporting | http://fineract.local/reporting/ |
+| Branch | http://fineract.local/branch/ |
+| Cashier | http://fineract.local/cashier/ |
+| Asset Manager | http://fineract.local/asset-manager/ |
+| Fineract API | http://fineract.local/fineract-provider/api |
+| Keycloak | http://auth.fineract.local |
+
+---
+
+## Lessons Learned (Wave 7 - Gateway)
+
+20. **Single gateway pattern** - Use a single gateway with path-based routing for all frontend apps instead of separate ingresses per app
+21. **OAuth2-Proxy integration** - The gateway uses `auth_request` directive to check authentication with OAuth2-Proxy
+22. **SPA base href** - Use nginx `sub_filter` to inject `<base href="/path/">` for subpath routing
+23. **Static assets bypass** - Static assets (JS, CSS, images) bypass auth for performance
+24. **Read/Write/Batch routing** - Fineract API routes GET to read service, POST/PUT/DELETE/PATCH to write service
+25. **DNS resolver** - Use kube-dns resolver for dynamic upstream resolution in nginx

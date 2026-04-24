@@ -1,0 +1,71 @@
+{{/*
+=============================================================================
+Admin Deployment Template
+=============================================================================
+Deployment for Admin UI application (NGINX serving static files)
+Requirements: 7.2, 7.5, 8.5, 12.6, 13.6
+=============================================================================
+*/}}
+{{- if .Values.admin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-admin
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "admin") | nindent 4 }}
+spec:
+  replicas: {{ .Values.admin.replicaCount | default .Values.ui.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "admin") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "admin") | nindent 8 }}
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: admin
+          image: "{{ .Values.admin.image.repository }}:{{ .Values.admin.image.tag | default .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.admin.image.pullPolicy | default .Values.ui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.admin.resources.requests.cpu | default .Values.ui.resources.requests.cpu }}
+              memory: {{ .Values.admin.resources.requests.memory | default .Values.ui.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.admin.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
+              memory: {{ .Values.admin.resources.limits.memory | default .Values.ui.resources.limits.memory }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "fineract-ui-stack.fullname" . }}-admin-nginx
+{{- end }}

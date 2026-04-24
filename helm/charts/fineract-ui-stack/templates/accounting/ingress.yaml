@@ -1,0 +1,42 @@
+{{/*
+=============================================================================
+Accounting Ingress Template
+=============================================================================
+Ingress for Accounting UI application with TLS and cert-manager
+Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+=============================================================================
+*/}}
+{{- if and .Values.accounting.enabled .Values.accounting.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-accounting
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "accounting") | nindent 4 }}
+  annotations:
+    {{- if and .Values.accounting.tls.enabled .Values.accounting.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.accounting.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.accounting.ingress.annotations }}
+    {{- toYaml .Values.accounting.ingress.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.accounting.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.accounting.hostname }}
+      secretName: {{ .Values.accounting.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.accounting.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-accounting
+                port:
+                  number: 80
+{{- end }}

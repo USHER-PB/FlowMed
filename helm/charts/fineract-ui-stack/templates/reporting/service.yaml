@@ -1,0 +1,25 @@
+{{/*
+=============================================================================
+Reporting Service Template
+=============================================================================
+ClusterIP service for Reporting UI application
+Requirements: 7.3
+=============================================================================
+*/}}
+{{- if .Values.reporting.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-reporting
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "reporting") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "reporting") | nindent 4 }}
+{{- end }}

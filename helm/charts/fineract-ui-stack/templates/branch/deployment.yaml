@@ -1,0 +1,71 @@
+{{/*
+=============================================================================
+Branch Deployment Template
+=============================================================================
+Deployment for Branch UI application (NGINX serving static files)
+Requirements: 7.2, 7.5, 8.5, 12.6, 13.6
+=============================================================================
+*/}}
+{{- if .Values.branch.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-branch
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "branch") | nindent 4 }}
+spec:
+  replicas: {{ .Values.branch.replicaCount | default .Values.ui.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "branch") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "branch") | nindent 8 }}
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: branch
+          image: "{{ .Values.branch.image.repository }}:{{ .Values.branch.image.tag | default .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.branch.image.pullPolicy | default .Values.ui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.branch.resources.requests.cpu | default .Values.ui.resources.requests.cpu }}
+              memory: {{ .Values.branch.resources.requests.memory | default .Values.ui.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.branch.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
+              memory: {{ .Values.branch.resources.limits.memory | default .Values.ui.resources.limits.memory }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "fineract-ui-stack.fullname" . }}-branch-nginx
+{{- end }}

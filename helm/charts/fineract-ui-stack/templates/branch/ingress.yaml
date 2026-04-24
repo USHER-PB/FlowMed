@@ -1,0 +1,42 @@
+{{/*
+=============================================================================
+Branch Ingress Template
+=============================================================================
+Ingress for Branch UI application with TLS and cert-manager
+Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+=============================================================================
+*/}}
+{{- if and .Values.branch.enabled .Values.branch.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-branch
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "branch") | nindent 4 }}
+  annotations:
+    {{- if and .Values.branch.tls.enabled .Values.branch.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.branch.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.branch.ingress.annotations }}
+    {{- toYaml .Values.branch.ingress.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.branch.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.branch.hostname }}
+      secretName: {{ .Values.branch.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.branch.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-branch
+                port:
+                  number: 80
+{{- end }}

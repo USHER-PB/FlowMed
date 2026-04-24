@@ -16,6 +16,7 @@
 global:
   domain: example.com
   environment: production
+  keycloakPublicUrl: http://auth.fineract.local
 
 # =============================================================================
 # Fineract Instances Configuration
@@ -124,11 +125,17 @@ redis:
 
 gateway:
   enabled: true
+  dnsResolver: kube-dns.kube-system.svc.cluster.local
   image:
     repository: nginx
     tag: "1.25-alpine"
     pullPolicy: IfNotPresent
   replicaCount: 2
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
   resources:
     requests:
       cpu: 100m
@@ -171,6 +178,7 @@ oauth2Proxy:
     clientId: fineract-api
     # clientSecret should be set via secrets.oauth2Proxy.clientSecret
   redirectUrl: https://api.fineract.example.com/oauth2/callback
+  externalUrl: https://api.fineract.example.com
   redis:
     enabled: false
     connectionUrl: ""

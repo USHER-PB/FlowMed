@@ -14,6 +14,8 @@
 global:
   domain: fineract.local
   environment: development
+  # Keycloak public URL (for gateway logout redirect)
+  keycloakPublicUrl: http://auth.fineract.local
 
 # =============================================================================
 # Fineract Instances Configuration
@@ -107,23 +109,30 @@ gateway:
   enabled: true
   image:
     repository: nginx
-    tag: "1.25-alpine"
-    pullPolicy: IfNotPresent
+    tag: "1.28.2-alpine"
+    pullPolicy: Always
+  port: 80
+  # DNS resolver for kube-dns
+  # To detect: kubectl get svc -n kube-system kube-dns -o jsonpath='{.spec.clusterIP}'
+  # K3s: 10.43.0.10 | kubeadm/default: 10.96.0.10 | EKS: 172.20.0.10
+  dnsResolver: "10.96.0.10"
   replicaCount: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 25m
+      memory: 32Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 100m
+      memory: 64Mi
+  hpa:
+    enabled: false
   ingress:
     enabled: true
     className: nginx
-    hostname: api.fineract.local
-    # Disable TLS for local deployment
+    hostname: fineract.local
+    # Disable TLS for local deployment - explicitly null out cert-manager
     annotations:
-      # No cert-manager annotations for local
+      cert-manager.io/cluster-issuer: null
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
       nginx.ingress.kubernetes.io/proxy-body-size: "50m"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
@@ -140,18 +149,26 @@ oauth2Proxy:
   enabled: true
   image:
     repository: quay.io/oauth2-proxy/oauth2-proxy
-    tag: "v7.5.1"
-    pullPolicy: IfNotPresent
+    tag: "v7.15.1"
+    pullPolicy: Always
   replicaCount: 1
+  port: 4180
+  # External URL used for OAuth2 redirect_url and cookie domain
+  externalUrl: "http://fineract.local"
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 25m
+      memory: 32Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 100m
+      memory: 96Mi
   # Cookie secret for session encryption (used when not in secret)
   cookieSecret: "9961a4c53b583afb7e31e9c3e5ef0c83"
+  # Cookie security settings — override in cloud values files
+  cookie:
+    secure: false       # Set true for HTTPS environments
+    samesite: "lax"     # Set "strict" for banking production
+    expire: "24h"       # 24h max; reduces stolen-session exposure
   keycloak:
     # Connect to existing Keycloak in fineract namespace
     url: http://keycloak.fineract.svc.cluster.local:8080
@@ -165,11 +182,11 @@ oauth2Proxy:
     # JWKS URL for token verification (internal URL)
     jwksUrl: http://keycloak.fineract.svc.cluster.local:8080/realms/fineract/protocol/openid-connect/certs
   # Local redirect URL (no TLS)
-  redirectUrl: http://api.fineract.local/oauth2/callback
-  # Disable cookie secure for local HTTP deployment
-  cookieSecure: false
+  redirectUrl: http://fineract.local/oauth2/callback
   # Skip issuer verification for HTTP (no TLS)
   oidcVerifyIssuer: false
+  hpa:
+    enabled: false
   # Redis session storage
   redis:
     enabled: true

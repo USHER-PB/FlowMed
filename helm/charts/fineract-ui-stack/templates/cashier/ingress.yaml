@@ -1,0 +1,42 @@
+{{/*
+=============================================================================
+Cashier Ingress Template
+=============================================================================
+Ingress for Cashier UI application with TLS and cert-manager
+Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+=============================================================================
+*/}}
+{{- if and .Values.cashier.enabled .Values.cashier.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-cashier
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "cashier") | nindent 4 }}
+  annotations:
+    {{- if and .Values.cashier.tls.enabled .Values.cashier.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.cashier.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.cashier.ingress.annotations }}
+    {{- toYaml .Values.cashier.ingress.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.cashier.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.cashier.hostname }}
+      secretName: {{ .Values.cashier.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.cashier.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-cashier
+                port:
+                  number: 80
+{{- end }}
