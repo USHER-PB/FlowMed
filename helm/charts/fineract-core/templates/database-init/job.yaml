@@ -1,0 +1,90 @@
+{{- if .Values.databaseInit.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-db-init
+  labels:
+    {{- include "fineract-core.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-init
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+      - name: db-init
+        image: "{{ .Values.databaseInit.image.repository }}:{{ .Values.databaseInit.image.tag }}"
+        imagePullPolicy: {{ .Values.databaseInit.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: PGHOST
+          value: {{ .Values.database.host | quote }}
+        - name: PGPORT
+          value: {{ .Values.database.port | quote }}
+        - name: PGUSER
+          value: {{ .Values.databaseInit.postgresUser | default "postgres" | quote }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.database.secretName }}
+              key: {{ .Values.secrets.database.postgresPasswordKey | default "postgres-password" }}
+        - name: APP_USER
+          value: {{ .Values.database.username | quote }}
+        - name: TENANT_DB
+          value: {{ .Values.database.tenantStoreName | quote }}
+        - name: DEFAULT_DB
+          value: {{ .Values.database.tenantName | quote }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h $PGHOST -p $PGPORT -U $PGUSER; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+          
+          echo "PostgreSQL is up - checking databases..."
+          
+          # Check if tenant database exists
+          DB_EXISTS=$(psql -U $PGUSER -tAc "SELECT 1 FROM pg_database WHERE datname = '$TENANT_DB'")
+          if [ "$DB_EXISTS" != "1" ]; then
+            echo "Creating database: $TENANT_DB"
+            psql -U $PGUSER -c "CREATE DATABASE $TENANT_DB OWNER $APP_USER;"
+          else
+            echo "Database $TENANT_DB already exists"
+          fi
+          
+          # Check if default database exists
+          DB_EXISTS=$(psql -U $PGUSER -tAc "SELECT 1 FROM pg_database WHERE datname = '$DEFAULT_DB'")
+          if [ "$DB_EXISTS" != "1" ]; then
+            echo "Creating database: $DEFAULT_DB"
+            psql -U $PGUSER -c "CREATE DATABASE $DEFAULT_DB OWNER $APP_USER;"
+          else
+            echo "Database $DEFAULT_DB already exists"
+          fi
+          
+          echo "Database initialization completed successfully"
+        resources:
+          {{- toYaml .Values.databaseInit.resources | nindent 10 }}
+{{- end }}
