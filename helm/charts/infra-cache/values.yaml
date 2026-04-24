@@ -36,9 +36,9 @@ redis:
         cpu: "250m"
 
   # Replica (and implicitly Sentinel) persistence and resources
-  # 1 Master + 2 Replicas = 3 nodes total for quorum
+  # 3 nodes total for proper HA quorum (each pod runs Redis + Sentinel)
   replica:
-    replicaCount: 2
+    replicaCount: 3
     persistence:
       enabled: true
       size: 1Gi
