@@ -1,0 +1,41 @@
+apiVersion: v2
+name: data-store
+description: |
+  Umbrella chart for foundational data persistence layer.
+  Deploys PostgreSQL + MinIO for local development environments.
+  For production, use external RDS and S3 services.
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+# Dependencies
+dependencies:
+  - name: postgres
+    version: "1.1.0"
+    repository: "file://../postgres"
+    condition: postgres.enabled
+  - name: minio
+    version: "1.1.0"
+    repository: "file://../minio"
+    condition: minio.enabled
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - postgresql
+  - minio
+  - s3
+  - database
+  - storage
+  - data
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0

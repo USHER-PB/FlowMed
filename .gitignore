@@ -46,3 +46,15 @@ prompts/
 *.swp
 *.swo
 TODO.md
+
+# Helm build artifacts
+**/charts/*.tgz
+**/Chart.lock
+
+# Ignore embedded chart dependencies (upstream charts downloaded by helm dependency update)
+# This ignores the entire charts/ subdirectory within each wrapper chart
+helm/charts/*/charts/
+
+# Binary tools
+kubeseal*
+*.tar.gz

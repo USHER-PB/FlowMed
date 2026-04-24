@@ -1,0 +1,18 @@
+{{- if and (include "postgres.standaloneEnabled" .) .Values.initScripts (not .Values.initScriptsConfigMap) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgres.fullname" . }}-init
+  namespace: {{ include "postgres.namespace" . }}
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $key, $value := .Values.initScripts }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- end }}
+{{- end }}

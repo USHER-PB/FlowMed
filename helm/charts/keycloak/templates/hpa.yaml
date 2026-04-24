@@ -1,0 +1,39 @@
+{{- if and .Values.keycloak.enabled .Values.keycloak.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: keycloak
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: keycloak
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: keycloak
+  minReplicas: {{ .Values.keycloak.hpa.minReplicas }}
+  maxReplicas: {{ .Values.keycloak.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.keycloak.hpa.targetCPU }}
+    {{- if .Values.keycloak.hpa.targetMemory }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.keycloak.hpa.targetMemory }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.keycloak.hpa.scaleDownStabilizationSeconds | default 300 }}
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+{{- end }}

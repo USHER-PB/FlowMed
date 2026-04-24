@@ -1,0 +1,25 @@
+apiVersion: v2
+name: sealed-secrets
+description: Sealed Secrets controller for GitOps-friendly secrets management
+type: application
+version: 1.0.0
+appVersion: "0.27.0"
+keywords:
+  - sealed-secrets
+  - secrets
+  - gitops
+  - security
+home: https://github.com/bitnami-labs/sealed-secrets
+sources:
+  - https://github.com/bitnami-labs/sealed-secrets
+maintainers:
+  - name: OM Platform Team
+    email: platform@example.com
+annotations:
+  artifacthub.io/category: security
+  artifacthub.io/license: Apache-2.0
+dependencies:
+  - name: sealed-secrets
+    version: "2.17.0"
+    repository: "https://bitnami-labs.github.io/sealed-secrets"
+    condition: sealed-secrets.enabled

@@ -1,0 +1,38 @@
+{{- if and .Values.enabled (eq (include "metallb.bgpEnabled" .) "true") }}
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: {{ include "metallb.fullname" . }}-bgp
+  namespace: {{ include "metallb.namespace" . }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bgp-advertisement
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "2"
+  {{- with .Values.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.bgpAdvertisement.ipAddressPools }}
+  ipAddressPools:
+    {{- toYaml .Values.bgpAdvertisement.ipAddressPools | nindent 4 }}
+  {{- end }}
+  {{- if .Values.bgpAdvertisement.aggregationLength }}
+  aggregationLength: {{ .Values.bgpAdvertisement.aggregationLength }}
+  {{- end }}
+  {{- if .Values.bgpAdvertisement.aggregationLengthV6 }}
+  aggregationLengthV6: {{ .Values.bgpAdvertisement.aggregationLengthV6 }}
+  {{- end }}
+  {{- if .Values.bgpAdvertisement.communities }}
+  communities:
+    {{- toYaml .Values.bgpAdvertisement.communities | nindent 4 }}
+  {{- end }}
+  {{- if .Values.bgpAdvertisement.localPref }}
+  localPref: {{ .Values.bgpAdvertisement.localPref }}
+  {{- end }}
+  {{- if .Values.bgpAdvertisement.peers }}
+  peers:
+    {{- toYaml .Values.bgpAdvertisement.peers | nindent 4 }}
+  {{- end }}
+{{- end }}
