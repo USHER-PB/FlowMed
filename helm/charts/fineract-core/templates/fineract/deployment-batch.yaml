@@ -54,9 +54,7 @@ spec:
           env:
             # Fineract instance mode
             - name: FINERACT_NODE_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              value: "3"
             - name: FINERACT_MODE_BATCH_ENABLED
               value: "true"
             # Management port for health checks and metrics
@@ -121,6 +119,7 @@ spec:
             httpGet:
               path: /actuator/health/liveness
               port: management
+              scheme: HTTPS
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 10
@@ -129,6 +128,7 @@ spec:
             httpGet:
               path: /actuator/health/readiness
               port: management
+              scheme: HTTPS
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -137,6 +137,7 @@ spec:
             httpGet:
               path: /actuator/health
               port: management
+              scheme: HTTPS
             initialDelaySeconds: 30
             periodSeconds: 15
             timeoutSeconds: 10
