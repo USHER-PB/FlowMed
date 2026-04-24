@@ -1,0 +1,64 @@
+{{- if (include "minio.internalEnabled" .) }}
+{{/*
+Headless Service for StatefulSet (required for distributed mode)
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "minio.fullname" . }}-headless
+  namespace: {{ include "minio.namespace" . }}
+  labels:
+    {{- include "minio.labels" . | nindent 4 }}
+    app.kubernetes.io/component: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  {{- if (include "minio.distributedEnabled" .) }}
+  publishNotReadyAddresses: true
+  {{- end }}
+  ports:
+    - name: api
+      port: {{ .Values.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+    {{- if .Values.console.enabled }}
+    - name: console
+      port: {{ .Values.service.consolePort }}
+      targetPort: console
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "minio.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+---
+{{/*
+Client Service (for application access)
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "minio.fullname" . }}
+  namespace: {{ include "minio.namespace" . }}
+  labels:
+    {{- include "minio.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: api
+      port: {{ .Values.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+    {{- if .Values.console.enabled }}
+    - name: console
+      port: {{ .Values.service.consolePort }}
+      targetPort: console
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "minio.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+{{- end }}

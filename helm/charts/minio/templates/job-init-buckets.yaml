@@ -1,0 +1,115 @@
+{{- if (include "minio.bucketInitEnabled" .) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "minio.fullname" . }}-init-buckets
+  namespace: {{ include "minio.namespace" . }}
+  labels:
+    {{- include "minio.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.bucketInit.backoffLimit }}
+  {{- with .Values.bucketInit.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "minio.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: init
+    spec:
+      {{- include "minio.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "minio.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mc
+          image: {{ include "minio.mcImage" . }}
+          imagePullPolicy: {{ .Values.mcImage.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Wait for MinIO to be ready
+              echo "Waiting for MinIO to be ready..."
+              until mc alias set myminio http://{{ include "minio.fullname" . }}.{{ include "minio.namespace" . }}.svc.cluster.local:{{ .Values.service.apiPort }} "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null; do
+                echo "MinIO not ready yet, waiting..."
+                sleep 2
+              done
+              echo "MinIO is ready!"
+              
+              # Create buckets
+              {{- range $bucket := .Values.buckets }}
+              echo "Creating bucket: {{ $bucket.name }}"
+              if ! mc ls myminio/{{ $bucket.name }} 2>/dev/null; then
+                mc mb myminio/{{ $bucket.name }}
+                echo "Bucket {{ $bucket.name }} created"
+              else
+                echo "Bucket {{ $bucket.name }} already exists"
+              fi
+              
+              {{- if $bucket.policy }}
+              # Set bucket policy
+              {{- if eq $bucket.policy "download" }}
+              mc anonymous set download myminio/{{ $bucket.name }}
+              {{- else if eq $bucket.policy "upload" }}
+              mc anonymous set upload myminio/{{ $bucket.name }}
+              {{- else if eq $bucket.policy "public" }}
+              mc anonymous set public myminio/{{ $bucket.name }}
+              {{- end }}
+              echo "Policy {{ $bucket.policy }} set for bucket {{ $bucket.name }}"
+              {{- end }}
+              
+              {{- if $bucket.quota }}
+              # Set bucket quota
+              mc quota set myminio/{{ $bucket.name }} --size {{ $bucket.quota }}
+              echo "Quota {{ $bucket.quota }} set for bucket {{ $bucket.name }}"
+              {{- end }}
+              
+              {{- end }}
+              
+              echo "Bucket initialization complete!"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "minio.secretName" . }}
+                  key: root-user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "minio.secretName" . }}
+                  key: root-password
+            - name: HOME
+              value: /tmp
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+            - name: XDG_CONFIG_HOME
+              value: /tmp
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.bucketInit.resources | nindent 12 }}
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}

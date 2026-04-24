@@ -1,0 +1,220 @@
+
+# =============================================================================
+# Data Store Umbrella Chart - Default Values
+# =============================================================================
+# Deploys PostgreSQL + MinIO for local development environments.
+# For production, use external RDS and S3 services.
+# =============================================================================
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  namespace: ""
+  imagePullSecrets: []
+  priorityClassName: ""
+
+# =============================================================================
+# PostgreSQL Configuration
+# =============================================================================
+postgres:
+  # Enable PostgreSQL deployment
+  enabled: true
+  
+  # Deployment mode: "standalone" or "cnpg"
+  mode: cnpg
+  
+  # Authentication
+  auth:
+    database: appdb
+    username: appuser
+    # Use existing secret for GitOps (sealed-secrets)
+    # Create sealed secret from configs/secrets/data-store-postgres-sealed.yaml
+    existingSecret: "data-store-postgres"
+    # Password keys in the secret
+    secretKeys:
+      password: password
+      postgresPassword: postgres-password
+  
+  # Resource allocation
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 200m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+  
+  # Persistence
+  persistence:
+    enabled: true
+    # Storage size for PostgreSQL data
+    size: 5Gi
+    storageClass: ""
+  
+  # Security context for Longhorn compatibility (standalone mode only)
+  # CNPG manages its own security context with UID 26
+  primary:
+    podSecurityContext:
+      fsGroup: 999
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false  # Required for PostgreSQL data directory
+      capabilities:
+        drop:
+          - ALL
+  
+  # Network Policy
+  networkPolicy:
+    enabled: true
+    ingressNamespaces: []
+  
+  # CNPG High Availability (when mode: cnpg)
+  # Requires CNPG operator: helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
+  # NOTE: Reduced to 2 instance for 2-node cluster - use 3+ for production HA
+  cnpg:
+    instances: 2
+    postgresql:
+      sharedBuffers: "256MB"
+      effectiveCacheSize: "768MB"
+      maxConnections: "200"
+      maxWalSize: "1GB"  # Must be smaller than walStorage.size
+      minWalSize: "128MB"
+    walStorage:
+      enabled: true
+      # WAL storage for write-ahead logs
+      size: "2Gi"
+    storage:
+      resizeInUseVolumes: true
+    affinity:
+      enablePodAntiAffinity: true
+      podAntiAffinityType: "preferred"
+      topologyKey: "kubernetes.io/hostname"
+
+# =============================================================================
+# MinIO Configuration
+# =============================================================================
+minio:
+  # Enable MinIO deployment
+  enabled: true
+  
+  # Deployment mode: "standalone" or "distributed"
+  mode: distributed
+  
+  # Authentication
+  auth:
+    rootUser: minioadmin
+    # Use existing secret for GitOps (sealed-secrets)
+    # Create sealed secret from configs/secrets/data-store-minio-sealed.yaml
+    existingSecret: "data-store-minio"
+    # Password key in the secret
+    secretKeys:
+      rootPassword: root-password
+  
+  # Disable init container for Longhorn compatibility
+  # Longhorn doesn't support chown in init containers
+  initContainer:
+    enabled: false
+  
+  # Buckets to create
+  buckets:
+    - name: documents
+      policy: none
+    - name: backups
+      policy: none
+  
+  # Resource allocation
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+  
+  # Persistence
+  persistence:
+    enabled: true
+    # Size reduced to 4Gi for local development with limited storage
+    # Longhorn creates 2 replicas by default, so 4Gi × 2 = 8Gi total
+    size: 4Gi
+    storageClass: ""
+  
+  # Security context for Longhorn compatibility
+  pod:
+    securityContext:
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false  # Required for MinIO data directory
+      capabilities:
+        drop:
+          - ALL
+  
+  # Console
+  console:
+    enabled: true
+    ingress:
+      enabled: false
+  
+  # Network Policy
+  networkPolicy:
+    enabled: true
+    ingressNamespaces: []
+  
+  # Distributed High Availability (when mode: distributed)
+  # MinIO distributed mode provides erasure coding and data replication
+  distributed:
+    replicas: 2  # Minimum for this local test cluster (production: 4, 6, 8, 12, or 16)
+    drivesPerNode: 1
+    storage:
+      # Reduced size for local development with limited storage
+      size: 2Gi
+      storageClass: ""
+    podAntiAffinity:
+      enabled: true
+      type: "preferred"  # preferred or required
+      topologyKey: "kubernetes.io/hostname"
+      weight: 100
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 100m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+# =============================================================================
+# External Database Configuration (for production)
+# =============================================================================
+# Set postgres.enabled=false and configure external database:
+# postgres:
+#   enabled: false
+#   mode: external
+#   external:
+#     host: mydb.xxxxx.region.rds.amazonaws.com
+#     port: 5432
+#     database: production
+#     existingSecret: rds-credentials
+
+# =============================================================================
+# External S3 Configuration (for production)
+# =============================================================================
+# Set minio.enabled=false and configure external S3:
+# minio:
+#   enabled: false
+#   mode: external
+#   external:
+#     endpoint: s3.amazonaws.com
+#     region: us-east-1
+#     existingSecret: s3-credentials

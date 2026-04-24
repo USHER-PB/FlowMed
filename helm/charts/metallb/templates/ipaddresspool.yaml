@@ -1,0 +1,27 @@
+{{- if and .Values.enabled (eq (include "metallb.ipPoolEnabled" .) "true") }}
+{{- $fullname := include "metallb.fullname" . }}
+{{- $namespace := include "metallb.namespace" . }}
+{{- range $name, $pool := .Values.ipAddressPools }}
+{{- if $pool.enabled }}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ include "metallb.ipPoolName" (dict "name" $name "pool" $pool) }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "metallb.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: ip-address-pool
+  {{- with $.Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  addresses:
+    {{- toYaml $pool.addresses | nindent 4 }}
+  {{- if kindIs "bool" $pool.autoAssign }}
+  autoAssign: {{ $pool.autoAssign }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

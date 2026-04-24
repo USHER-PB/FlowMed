@@ -1,0 +1,266 @@
+# MetalLB Helm Chart Values
+# Reference: https://metallb.universe.tf/configuration/
+
+# -- Enable MetalLB installation
+enabled: true
+
+# -- MetalLB namespace (will be created if not exists)
+namespace: metallb-system
+
+# ===========================================
+# MetalLB Subchart Configuration
+# ===========================================
+metallb:
+  enabled: true
+  # CRDs are included in the chart
+  crds:
+    enabled: true
+  # Speaker configuration
+  speaker:
+    enabled: true
+    logLevel: info
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists
+  # Controller configuration
+  controller:
+    enabled: true
+    logLevel: info
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ===========================================
+# IP Address Pool Configuration
+# ===========================================
+
+# -- IP address pools for LoadBalancer services
+# Configure one or more pools with IP ranges
+ipAddressPools:
+  # -- Primary IP pool for production services
+  primary:
+    # -- Enable this IP pool
+    enabled: true
+    # -- IP address ranges (can be single IPs, CIDR, or ranges)
+    addresses:
+      - "192.168.1.200-192.168.1.210"
+    # -- Auto-assign IPs from this pool (default: true)
+    autoAssign: true
+    # -- Pool name (defaults to key name if not specified)
+    name: ""
+
+  # -- Secondary IP pool for development/staging
+  secondary:
+    enabled: false
+    addresses:
+      - "192.168.1.211-192.168.1.220"
+    autoAssign: true
+    name: ""
+
+# ===========================================
+# BGP Configuration (Advanced)
+# ===========================================
+
+# -- BGP peers for Layer 3 routing
+# Enable for production multi-path routing
+bgp:
+  enabled: false
+  # -- BGP autonomous system number for MetalLB
+  myASN: 64512
+  # -- BGP peers configuration
+  peers:
+    - name: "router-1"
+      enabled: false
+      # -- Peer IP address
+      address: "192.168.1.1"
+      # -- Peer ASN
+      asn: 64513
+      # -- BGP port
+      port: 179
+      # -- Hold time in seconds
+      holdTime: 180
+      # -- Keepalive time in seconds
+      keepaliveTime: 30
+      # -- Router ID (optional)
+      routerID: ""
+      # -- Password for BGP session (optional)
+      password: ""
+      # -- BGP communities
+      communities: []
+      # -- BGP advertisements
+      advertisements: []
+
+# ===========================================
+# L2 Advertisement Configuration
+# ===========================================
+
+# -- Layer 2 advertisement (ARP/NDP)
+# Simplest mode for small networks
+l2Advertisement:
+  # -- Enable L2 advertisement
+  enabled: true
+  # -- IP pools to advertise (empty = all pools)
+  ipAddressPools: []
+  # -- IP pool selectors
+  ipAddressPoolSelectors: []
+  # -- Node selectors for advertisement
+  nodeSelectors: []
+
+# ===========================================
+# BGP Advertisement Configuration
+# ===========================================
+
+# -- BGP advertisement configuration
+bgpAdvertisement:
+  enabled: false
+  # -- IP pools to advertise
+  ipAddressPools: []
+  # -- Advertisement length (CIDR prefix)
+  aggregationLength: 32
+  # -- IPv6 aggregation length
+  aggregationLengthV6: 128
+  # -- BGP communities to attach
+  communities: []
+  # -- Local preference for BGP
+  localPref: ""
+
+# ===========================================
+# Speaker Configuration (Overrides)
+# ===========================================
+
+speaker:
+  # -- Enable speaker component
+  enabled: true
+  # -- Speaker log level (info, debug, error)
+  logLevel: info
+  # -- Speaker resources
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  # -- Node selector for speaker pods
+  nodeSelector: {}
+  # -- Tolerations for speaker pods
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+      operator: Exists
+  # -- Affinity for speaker pods
+  affinity: {}
+  # -- Security context for speaker
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# ===========================================
+# Controller Configuration (Overrides)
+# ===========================================
+
+controller:
+  # -- Enable controller component
+  enabled: true
+  # -- Controller log level (info, debug, error)
+  logLevel: info
+  # -- Controller resources
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  # -- Node selector for controller pod
+  nodeSelector: {}
+  # -- Tolerations for controller pod
+  tolerations: []
+  # -- Affinity for controller pod
+  affinity: {}
+  # -- Security context for controller
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# ===========================================
+# Network Policy Configuration
+# ===========================================
+
+networkPolicy:
+  # -- Enable network policies
+  enabled: false
+  # -- Allowed namespaces for access
+  allowedNamespaces:
+    - ingress-nginx
+    - kube-system
+
+# ===========================================
+# Prometheus Monitoring
+# ===========================================
+
+monitoring:
+  # -- Enable Prometheus monitoring
+  enabled: false
+  # -- Prometheus namespace
+  prometheusNamespace: monitoring
+  # -- ServiceMonitor labels
+  serviceMonitorLabels: {}
+  # -- Prometheus annotations
+  prometheusAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7472"
+
+# ===========================================
+# Common Configuration
+# ===========================================
+
+# -- Common labels for all resources
+commonLabels: {}
+
+# -- Common annotations for all resources
+commonAnnotations: {}
+
+# -- Pod security context
+podSecurityContext:
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Priority class name
+priorityClassName: ""
+
+# -- Image pull secrets
+imagePullSecrets: []

@@ -1,0 +1,25 @@
+apiVersion: v2
+name: metallb
+description: A Helm chart for MetalLB - a load-balancer implementation for Kubernetes bare-metal clusters
+type: application
+version: 1.0.0
+appVersion: "0.14.8"
+keywords:
+  - metallb
+  - loadbalancer
+  - bare-metal
+  - networking
+home: https://metallb.universe.tf
+sources:
+  - https://github.com/metallb/metallb
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+annotations:
+  artifacthub.io/category: networking
+  artifacthub.io/license: Apache-2.0
+dependencies:
+  - name: metallb
+    version: "0.14.8"
+    repository: "https://metallb.github.io/metallb"
+    condition: metallb.enabled

@@ -1,0 +1,13 @@
+{{- if and .Values.keycloak.enabled .Values.keycloakConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "keycloak.fullname" . }}-keycloak-realm
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-config
+data:
+  realm-fineract.yaml: |
+{{ tpl (.Files.Get "files/realm-fineract.yaml") . | indent 4 }}
+{{- end }}
