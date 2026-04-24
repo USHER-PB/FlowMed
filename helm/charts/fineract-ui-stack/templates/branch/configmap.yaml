@@ -1,27 +1,19 @@
 {{/*
-=============================================================================
-Branch ConfigMap Template
-=============================================================================
-ConfigMap containing config.json for Branch UI application
-Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
-=============================================================================
-*/}}
+ =============================================================================
+ Branch ConfigMap Template
+ =============================================================================
+ ConfigMap containing nginx config for Branch UI application
+ Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
+ =============================================================================
+ */}}
 {{- if .Values.branch.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "fineract-ui-stack.fullname" . }}-branch-config
+  name: {{ include "fineract-ui-stack.fullname" . }}-branch-nginx
   labels:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "branch") | nindent 4 }}
 data:
-  config.json: |
-    {
-      "apiEndpoint": "{{ .Values.global.apiEndpoint }}",
-      "keycloak": {
-        "url": "{{ .Values.global.keycloak.url }}",
-        "realm": "{{ .Values.global.keycloak.realm }}",
-        "clientId": "{{ .Values.branch.keycloak.clientId }}",
-        "redirectUri": "https://{{ .Values.branch.hostname }}"
-      }
-    }
+  default.conf: |
+{{ .Files.Get "files/frontend-default.conf" | indent 4 }}
 {{- end }}

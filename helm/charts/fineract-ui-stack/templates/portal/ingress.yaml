@@ -14,14 +14,20 @@ metadata:
   labels:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "portal") | nindent 4 }}
   annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.portal.ingress.clusterIssuer | default "letsencrypt-prod" }}
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- if and .Values.portal.tls.enabled .Values.portal.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.portal.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.portal.ingress.annotations }}
+    {{- toYaml .Values.portal.ingress.annotations | nindent 4 }}
+    {{- end }}
 spec:
   ingressClassName: nginx
+  {{- if .Values.portal.tls.enabled }}
   tls:
     - hosts:
         - {{ .Values.portal.hostname }}
       secretName: {{ .Values.portal.tls.secretName }}
+  {{- end }}
   rules:
     - host: {{ .Values.portal.hostname }}
       http:

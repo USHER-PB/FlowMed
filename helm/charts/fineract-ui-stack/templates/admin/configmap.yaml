@@ -1,27 +1,19 @@
 {{/*
-=============================================================================
-Admin ConfigMap Template
-=============================================================================
-ConfigMap containing config.json for Admin UI application
-Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
-=============================================================================
-*/}}
+ =============================================================================
+ Admin ConfigMap Template
+ =============================================================================
+ ConfigMap containing nginx config for Admin UI application
+ Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
+ =============================================================================
+ */}}
 {{- if .Values.admin.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "fineract-ui-stack.fullname" . }}-admin-config
+  name: {{ include "fineract-ui-stack.fullname" . }}-admin-nginx
   labels:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "admin") | nindent 4 }}
 data:
-  config.json: |
-    {
-      "apiEndpoint": "{{ .Values.global.apiEndpoint }}",
-      "keycloak": {
-        "url": "{{ .Values.global.keycloak.url }}",
-        "realm": "{{ .Values.global.keycloak.realm }}",
-        "clientId": "{{ .Values.admin.keycloak.clientId }}",
-        "redirectUri": "https://{{ .Values.admin.hostname }}"
-      }
-    }
+  default.conf: |
+{{ .Files.Get "files/frontend-default.conf" | indent 4 }}
 {{- end }}

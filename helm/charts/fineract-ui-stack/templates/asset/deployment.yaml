@@ -15,6 +15,8 @@ metadata:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "asset") | nindent 4 }}
 spec:
   replicas: {{ .Values.asset.replicaCount | default .Values.ui.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "asset") | nindent 6 }}
@@ -23,6 +25,10 @@ spec:
       labels:
         {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "asset") | nindent 8 }}
     spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
       containers:
         - name: asset
           image: "{{ .Values.asset.image.repository }}:{{ .Values.asset.image.tag | default .Values.ui.image.tag }}"
@@ -55,12 +61,11 @@ spec:
               cpu: {{ .Values.asset.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
               memory: {{ .Values.asset.resources.limits.memory | default .Values.ui.resources.limits.memory }}
           volumeMounts:
-            - name: config
-              mountPath: /usr/share/nginx/html/assets/config.json
-              subPath: config.json
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
               readOnly: true
       volumes:
-        - name: config
+        - name: nginx-config
           configMap:
-            name: {{ include "fineract-ui-stack.fullname" . }}-asset-config
+            name: {{ include "fineract-ui-stack.fullname" . }}-asset-nginx
 {{- end }}

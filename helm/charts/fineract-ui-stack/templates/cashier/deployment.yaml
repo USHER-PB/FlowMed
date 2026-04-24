@@ -15,6 +15,8 @@ metadata:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "cashier") | nindent 4 }}
 spec:
   replicas: {{ .Values.cashier.replicaCount | default .Values.ui.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "cashier") | nindent 6 }}
@@ -23,6 +25,10 @@ spec:
       labels:
         {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "cashier") | nindent 8 }}
     spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
       containers:
         - name: cashier
           image: "{{ .Values.cashier.image.repository }}:{{ .Values.cashier.image.tag | default .Values.ui.image.tag }}"
@@ -55,12 +61,11 @@ spec:
               cpu: {{ .Values.cashier.resources.limits.cpu | default .Values.ui.resources.limits.cpu }}
               memory: {{ .Values.cashier.resources.limits.memory | default .Values.ui.resources.limits.memory }}
           volumeMounts:
-            - name: config
-              mountPath: /usr/share/nginx/html/assets/config.json
-              subPath: config.json
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
               readOnly: true
       volumes:
-        - name: config
+        - name: nginx-config
           configMap:
-            name: {{ include "fineract-ui-stack.fullname" . }}-cashier-config
+            name: {{ include "fineract-ui-stack.fullname" . }}-cashier-nginx
 {{- end }}

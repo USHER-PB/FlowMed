@@ -14,14 +14,20 @@ metadata:
   labels:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "accounting") | nindent 4 }}
   annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.accounting.ingress.clusterIssuer | default "letsencrypt-prod" }}
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- if and .Values.accounting.tls.enabled .Values.accounting.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.accounting.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.accounting.ingress.annotations }}
+    {{- toYaml .Values.accounting.ingress.annotations | nindent 4 }}
+    {{- end }}
 spec:
   ingressClassName: nginx
+  {{- if .Values.accounting.tls.enabled }}
   tls:
     - hosts:
         - {{ .Values.accounting.hostname }}
       secretName: {{ .Values.accounting.tls.secretName }}
+  {{- end }}
   rules:
     - host: {{ .Values.accounting.hostname }}
       http:

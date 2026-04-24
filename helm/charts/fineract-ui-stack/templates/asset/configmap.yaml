@@ -1,27 +1,19 @@
 {{/*
- =============================================================================
- Asset ConfigMap Template
- =============================================================================
- ConfigMap containing config.json for Asset UI application
- Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
- =============================================================================
- */}}
+  =============================================================================
+  Asset ConfigMap Template
+  =============================================================================
+  ConfigMap containing nginx config for Asset UI application
+  Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
+  =============================================================================
+  */}}
 {{- if .Values.asset.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "fineract-ui-stack.fullname" . }}-asset-config
+  name: {{ include "fineract-ui-stack.fullname" . }}-asset-nginx
   labels:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "asset") | nindent 4 }}
 data:
-  config.json: |
-    {
-      "apiEndpoint": "{{ .Values.global.apiEndpoint }}",
-      "keycloak": {
-        "url": "{{ .Values.global.keycloak.url }}",
-        "realm": "{{ .Values.global.keycloak.realm }}",
-        "clientId": "{{ .Values.asset.keycloak.clientId }}",
-        "redirectUri": "https://{{ .Values.asset.hostname }}"
-      }
-    }
+  default.conf: |
+{{ .Files.Get "files/frontend-default.conf" | indent 4 }}
 {{- end }}

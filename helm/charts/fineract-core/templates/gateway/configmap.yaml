@@ -1,9 +1,9 @@
 {{/*
-=============================================================================
-NGINX Gateway ConfigMap
-=============================================================================
-Validates: Requirements 1.4, 4.2, 4.3, 4.6
-=============================================================================
+ =============================================================================
+ NGINX Gateway ConfigMap
+ =============================================================================
+ Validates: Requirements 1.4, 4.2, 4.3, 4.6
+ =============================================================================
 */}}
 {{- if .Values.gateway.enabled -}}
 apiVersion: v1
@@ -17,96 +17,10 @@ metadata:
     {{- . | nindent 4 }}
   {{- end }}
 data:
-  nginx.conf: |
-    worker_processes auto;
-    error_log /var/log/nginx/error.log warn;
-    pid /tmp/nginx.pid;
-
-    events {
-        worker_connections 1024;
-    }
-
-    http {
-        include /etc/nginx/mime.types;
-        default_type application/octet-stream;
-
-        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                        '$status $body_bytes_sent "$http_referer" '
-                        '"$http_user_agent" "$http_x_forwarded_for"';
-
-        access_log /var/log/nginx/access.log main;
-
-        sendfile on;
-        keepalive_timeout 65;
-
-        # Upstream definitions for Fineract services
-        upstream fineract-read {
-            server {{ include "fineract-core.fullname" . }}-read.{{ .Release.Namespace }}.svc.cluster.local:8080;
-        }
-
-        upstream fineract-write {
-            server {{ include "fineract-core.fullname" . }}-write.{{ .Release.Namespace }}.svc.cluster.local:8080;
-        }
-
-        upstream fineract-batch {
-            server {{ include "fineract-core.fullname" . }}-batch.{{ .Release.Namespace }}.svc.cluster.local:8080;
-        }
-
-        server {
-            listen 8080;
-            server_name _;
-
-            # Proxy settings
-            proxy_connect_timeout 60s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
-            proxy_buffering on;
-            proxy_buffer_size 4k;
-            proxy_buffers 8 4k;
-
-            # Proxy headers
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Batch endpoints - route to batch service
-            location ~ ^/fineract-provider/api/v1/batch {
-                proxy_pass http://fineract-batch;
-            }
-
-            # GET requests - route to read service
-            location /fineract-provider/api {
-                if ($request_method = GET) {
-                    proxy_pass http://fineract-read;
-                }
-
-                # POST/PUT/DELETE/PATCH requests - route to write service
-                if ($request_method = POST) {
-                    proxy_pass http://fineract-write;
-                }
-                if ($request_method = PUT) {
-                    proxy_pass http://fineract-write;
-                }
-                if ($request_method = DELETE) {
-                    proxy_pass http://fineract-write;
-                }
-                if ($request_method = PATCH) {
-                    proxy_pass http://fineract-write;
-                }
-            }
-
-            # Default location - route to read service for health checks
-            location / {
-                proxy_pass http://fineract-read;
-            }
-
-            # Health check endpoint
-            location /nginx-health {
-                access_log off;
-                return 200 "healthy\n";
-                add_header Content-Type text/plain;
-            }
-        }
-    }
+  gateway.conf: |
+    {{- .Files.Get "files/nginx/gateway.conf" | replace "KUBE_DNS_RESOLVER" .Values.gateway.dnsResolver | replace "KUBE_NAMESPACE" .Release.Namespace | replace "KEYCLOAK_PUBLIC_URL" .Values.global.keycloakPublicUrl | replace "GATEWAY_EXTERNAL_URL_ENCODED" (.Values.oauth2Proxy.externalUrl | replace ":" "%3A" | replace "/" "%2F") | replace "OAUTH2_PROXY_SERVICE" (printf "%s-oauth2-proxy" (include "fineract-core.fullname" .)) | nindent 4 }}
+  oauth2-auth-cookie.conf: |
+    {{- .Files.Get "files/nginx/oauth2-auth-cookie.conf" | nindent 4 }}
+  security-headers.conf: |
+    {{- .Files.Get "files/nginx/security-headers.conf" | nindent 4 }}
 {{- end }}
