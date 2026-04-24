@@ -41,12 +41,14 @@ spec:
         - name: PGPORT
           value: {{ .Values.database.port | quote }}
         - name: PGUSER
-          value: {{ .Values.databaseInit.postgresUser | default "postgres" | quote }}
+          value: {{ .Values.database.username | quote }}
         - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ .Values.secrets.database.secretName }}
-              key: {{ .Values.secrets.database.postgresPasswordKey | default "postgres-password" }}
+              key: {{ .Values.secrets.database.passwordKey | default "password" }}
+        - name: PGDATABASE
+          value: "postgres"
         - name: APP_USER
           value: {{ .Values.database.username | quote }}
         - name: TENANT_DB

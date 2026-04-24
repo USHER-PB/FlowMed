@@ -59,8 +59,8 @@ spec:
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.keycloak.secretName }}
-                  key: {{ .Values.secrets.keycloak.clientSecretKey | default "keycloak-client-secret" }}
+                  name: {{ .Values.secrets.userSync.secretName }}
+                  key: {{ .Values.secrets.userSync.clientSecretKey | default "keycloak-client-secret" }}
             # Fineract API connection
             - name: FINERACT_API_URL
               value: "http://{{ include "fineract-core.fullname" . }}-write:8080"

@@ -192,11 +192,11 @@ userSync:
   port: 5000
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 10m
+      memory: 64Mi
     limits:
-      cpu: 250m
-      memory: 256Mi
+      cpu: 100m
+      memory: 128Mi
   syncIntervalSeconds: 300
   # Keycloak connection settings for user synchronization
   keycloak:
@@ -243,13 +243,13 @@ secrets:
     # Reference the existing postgres secret created by data-store chart
     secretName: data-store-postgres
     password: ""
-    # Key for postgres admin password (used by database-init job)
-    postgresPasswordKey: postgres-password
+    # Key for appuser password (used by database-init job)
+    passwordKey: password
   keycloak:
     # Reference the existing keycloak admin secret
     secretName: keycloak-keycloak
     # Key mappings for existing secret keys
-    adminPasswordKey: admin-password
+    adminPasswordKey: KEYCLOAK_ADMIN_PASSWORD
   userSync:
     # Reference the existing user-sync-credentials secret
     secretName: user-sync-credentials
@@ -282,11 +282,11 @@ databaseInit:
   postgresUser: postgres
   resources:
     requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
       cpu: 100m
       memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
 
 # =============================================================================
 # Keycloak Initialization Job
@@ -300,18 +300,18 @@ keycloakInit:
     tag: "8.5.0"
     pullPolicy: IfNotPresent
   # Keycloak connection settings
-  url: http://keycloak-service.fineract.svc.cluster.local:8080
+  url: http://keycloak.fineract.svc.cluster.local:8080
   realm: fineract
   adminUser: admin
   # Redirect URIs for the client (JSON array format)
   redirectUras: '["https://fineract.local/*", "http://localhost:8080/*"]'
   resources:
     requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
       cpu: 100m
       memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
 
 # =============================================================================
 # Service Account Configuration

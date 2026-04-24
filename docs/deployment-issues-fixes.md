@@ -209,14 +209,127 @@ All secrets are managed via SealedSecrets, ensuring the deployment is fully auto
 
 ---
 
+## Issue 8: Keycloak-Init Job - Wrong Service URL
+
+**Symptom:**
+```
+Keycloak is unavailable - sleeping
+<previous line repeated many times>
+```
+
+**Root Cause:**
+The keycloak-init job was configured to connect to `keycloak-service.fineract.svc.cluster.local` but the actual Keycloak service is named `keycloak`.
+
+**Fix:**
+Updated the URL in [`fineract-core-values.yaml`](../helm/values/dev/fineract-core-values.yaml):
+```yaml
+keycloakInit:
+  url: http://keycloak.fineract.svc.cluster.local:8080  # Changed from keycloak-service
+```
+
+---
+
+## Issue 9: Keycloak-Init Job - Wrong Health Check Endpoint
+
+**Symptom:**
+```
+HTTP_CODE: 404
+{"error":"Unable to find matching target resource method"}
+```
+
+**Root Cause:**
+The job was checking `/health` endpoint which doesn't exist in Keycloak. Keycloak exposes health status via `/realms/master` endpoint.
+
+**Fix:**
+Updated the health check in [`keycloak-init/job.yaml`](../helm/charts/fineract-core/templates/keycloak-init/job.yaml):
+```bash
+# Changed from:
+until curl -s -o /dev/null -w "%{http_code}" ${KEYCLOAK_URL}/health | grep -q "200"; do
+# To:
+until curl -s -o /dev/null -w "%{http_code}" ${KEYCLOAK_URL}/realms/master | grep -q "200"; do
+```
+
+---
+
+## Issue 10: Keycloak-Init Job - Missing jq Binary
+
+**Symptom:**
+```
+/bin/sh: jq: not found
+```
+
+**Root Cause:**
+The `curlimages/curl` image doesn't include `jq` which is required for parsing JSON responses from Keycloak API.
+
+**Fix:**
+Changed the image in [`keycloak-init/job.yaml`](../helm/charts/fineract-core/templates/keycloak-init/job.yaml) to `nicolaka/netshoot:latest` which includes both `curl` and `jq`:
+```yaml
+image: "nicolaka/netshoot:latest"
+imagePullPolicy: IfNotPresent
+```
+
+---
+
+## Issue 11: User-Sync Deployment - Wrong Secret Reference
+
+**Symptom:**
+```
+Error: couldn't find key keycloak-client-secret in Secret fineract/keycloak-keycloak
+```
+
+**Root Cause:**
+The user-sync deployment was referencing `secrets.keycloak.secretName` (which is `keycloak-keycloak`) instead of `secrets.userSync.secretName` (which is `user-sync-credentials`). The client secret for user-sync is stored in `user-sync-credentials` secret, not in the Keycloak admin secret.
+
+**Fix:**
+Updated the secret reference in [`user-sync/deployment.yaml`](../helm/charts/fineract-core/templates/user-sync/deployment.yaml):
+```yaml
+# Changed from:
+secretKeyRef:
+  name: {{ .Values.secrets.keycloak.secretName }}
+  key: {{ .Values.secrets.keycloak.clientSecretKey | default "keycloak-client-secret" }}
+# To:
+secretKeyRef:
+  name: {{ .Values.secrets.userSync.secretName }}
+  key: {{ .Values.secrets.userSync.clientSecretKey | default "keycloak-client-secret" }}
+```
+
+---
+
+## Issue 12: User-Sync Pod - Insufficient CPU Resources
+
+**Symptom:**
+```
+0/3 nodes are available: 2 Insufficient cpu
+```
+
+**Root Cause:**
+The cluster had limited CPU resources available. The user-sync pod was requesting 50m CPU which couldn't be scheduled.
+
+**Fix:**
+Reduced CPU requests in [`fineract-core-values.yaml`](../helm/values/dev/fineract-core-values.yaml):
+```yaml
+userSync:
+  resources:
+    requests:
+      cpu: 10m      # Changed from 50m
+      memory: 64Mi  # Changed from 128Mi
+    limits:
+      cpu: 100m     # Changed from 250m
+      memory: 128Mi # Changed from 256Mi
+```
+
+---
+
 ## Summary of Files Modified
 
 | File | Changes |
 |------|---------|
-| `helm/values/dev/fineract-core-values.yaml` | Merged duplicate `fineract:` keys, fixed `userSync.keycloak.clientId`, increased memory for read/batch |
+| `helm/values/dev/fineract-core-values.yaml` | Merged duplicate `fineract:` keys, fixed `userSync.keycloak.clientId`, increased memory for read/batch, fixed keycloak-init URL, reduced user-sync resources |
 | `helm/charts/fineract-core/templates/fineract/deployment-write.yaml` | Fixed `FINERACT_NODE_ID`, added `scheme: HTTPS` to probes |
 | `helm/charts/fineract-core/templates/fineract/deployment-read.yaml` | Fixed `FINERACT_NODE_ID`, added `scheme: HTTPS` to probes |
 | `helm/charts/fineract-core/templates/fineract/deployment-batch.yaml` | Fixed `FINERACT_NODE_ID`, added `scheme: HTTPS` to probes |
+| `helm/charts/fineract-core/templates/keycloak-init/job.yaml` | Fixed health check endpoint, changed image to nicolaka/netshoot |
+| `helm/charts/fineract-core/templates/user-sync/deployment.yaml` | Fixed secret reference for KEYCLOAK_CLIENT_SECRET |
 
 ---
 
@@ -269,10 +382,8 @@ databaseInit:
 
 keycloakInit:
   enabled: true  # Auto-create realm and client
-  image:
-    repository: curlimages/curl
-    tag: "8.5.0"
-  url: http://keycloak-service.fineract.svc.cluster.local:8080
+  image: nicolaka/netshoot:latest  # Includes curl and jq
+  url: http://keycloak.fineract.svc.cluster.local:8080  # Use actual service name
   realm: fineract
 ```
 
@@ -308,3 +419,8 @@ helm upgrade --install fineract-core ./helm/charts/fineract-core \
 6. **Memory requirements** - Fineract requires at least 2Gi memory for reliable startup; ClassGraph scanning is memory-intensive
 7. **Sealed Secrets** - Using SealedSecrets ensures secure, automated secret management for reproducible deployments
 8. **Helm hooks** - Use pre-install hooks for dependency initialization to ensure clean environment deployments work automatically
+9. **Service names must match exactly** - Verify actual service names in the cluster before configuring init jobs (e.g., `keycloak` vs `keycloak-service`)
+10. **Health check endpoints vary by application** - Keycloak uses `/realms/master` not `/health`; always verify the correct endpoint for each application
+11. **Init container images need required tools** - Ensure the image has all necessary binaries (curl, jq, etc.); `nicolaka/netshoot` is a good debugging image
+12. **Secret references must match actual storage** - Different components may store credentials in different secrets; verify which secret contains which key
+13. **Resource constraints in dev clusters** - Reduce CPU/memory requests for non-critical workloads to allow scheduling on resource-constrained clusters

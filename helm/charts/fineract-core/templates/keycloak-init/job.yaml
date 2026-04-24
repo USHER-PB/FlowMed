@@ -27,8 +27,8 @@ spec:
         fsGroup: 1001
       containers:
       - name: keycloak-init
-        image: "{{ .Values.keycloakInit.image.repository }}:{{ .Values.keycloakInit.image.tag }}"
-        imagePullPolicy: {{ .Values.keycloakInit.image.pullPolicy }}
+        image: "nicolaka/netshoot:latest"
+        imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -63,7 +63,7 @@ spec:
           set -e
           
           echo "Waiting for Keycloak to be ready..."
-          until curl -s -o /dev/null -w "%{http_code}" ${KEYCLOAK_URL}/health | grep -q "200"; do
+          until curl -s -o /dev/null -w "%{http_code}" ${KEYCLOAK_URL}/realms/master | grep -q "200"; do
             echo "Keycloak is unavailable - sleeping"
             sleep 5
           done
