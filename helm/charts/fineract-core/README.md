@@ -189,6 +189,7 @@ This chart uses SealedSecrets for secure secret management in GitOps workflows. 
 | `fineract-keycloak-sealed` | `clientId`, `clientSecret` | User Sync, OAuth2 Proxy |
 | `fineract-oauth2-proxy-sealed` | `clientId`, `clientSecret`, `cookieSecret` | OAuth2 Proxy |
 | `fineract-api-sealed` | `username`, `password` | User Sync, Config CLI |
+| `user-sync-credentials` | `keycloak-client-secret` | User Sync Service |
 
 #### Creating SealedSecrets
 

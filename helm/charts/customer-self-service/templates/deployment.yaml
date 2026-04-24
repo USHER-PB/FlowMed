@@ -106,6 +106,8 @@ spec:
               value: {{ .Values.config.fineract.url | quote }}
             - name: FINERACT_TOKEN_URL
               value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/token"
+            - name: FINERACT_AUTH_TYPE
+              value: "basic"
             - name: FINERACT_CLIENT_ID
               value: {{ .Values.config.keycloak.clientId | default "customer-registration" | quote }}
             - name: FINERACT_CLIENT_SECRET

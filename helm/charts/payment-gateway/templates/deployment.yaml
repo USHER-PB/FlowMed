@@ -105,18 +105,7 @@ spec:
             - name: FINERACT_TENANT
               value: {{ .Values.config.fineract.tenant | default "default" | quote }}
             - name: FINERACT_AUTH_TYPE
-              value: "oauth"
-            - name: FINERACT_TOKEN_URL
-              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/token"
-            - name: FINERACT_CLIENT_ID
-              value: {{ .Values.config.keycloak.clientId | quote }}
-            - name: FINERACT_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "payment-gateway.secretName" . }}
-                  key: keycloak-client-secret
-            - name: FINERACT_OAUTH_GRANT_TYPE
-              value: "client_credentials"
+              value: "basic"
             - name: FINERACT_SAVINGS_PRODUCT_ID
               value: {{ .Values.config.fineract.savingsProductId | quote }}
             - name: FINERACT_USERNAME

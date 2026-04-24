@@ -3,17 +3,17 @@ Thank you for installing {{ .Chart.Name }}!
 Your Fineract Application Services deployment is now running.
 
 Deployed Services:
-{{- if .Values.paymentGateway.enabled }}
-  - Payment Gateway (port {{ .Values.paymentGateway.service.port | default 8082 }})
+{{- if (index .Values "payment-gateway" "enabled") }}
+  - Payment Gateway (port {{ (index .Values "payment-gateway" "service" "port") | default 8082 }})
 {{- end }}
-{{- if .Values.assetService.enabled }}
-  - Asset Service (port {{ .Values.assetService.service.port | default 8083 }})
+{{- if (index .Values "asset-service" "enabled") }}
+  - Asset Service (port {{ (index .Values "asset-service" "service" "port") | default 8083 }})
 {{- end }}
-{{- if .Values.customerSelfService.enabled }}
-  - Customer Self-Service (port {{ .Values.customerSelfService.service.port | default 8080 }})
+{{- if (index .Values "customer-self-service" "enabled") }}
+  - Customer Self-Service (port {{ (index .Values "customer-self-service" "service" "port") | default 8080 }})
 {{- end }}
-{{- if .Values.smsGateway.enabled }}
-  - SMS Gateway (port {{ .Values.smsGateway.service.port | default 8080 }})
+{{- if (index .Values "sms-gateway" "enabled") }}
+  - SMS Gateway (port {{ (index .Values "sms-gateway" "service" "port") | default 8080 }})
 {{- end }}
 
 Global Configuration:

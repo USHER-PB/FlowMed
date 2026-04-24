@@ -39,7 +39,7 @@ spec:
           env:
             # Fineract API connection
             - name: FINERACT_BASE_URL
-              value: "http://{{ include "fineract-core.fullname" . }}-write:8080/fineract-provider"
+              value: "https://{{ include "fineract-core.fullname" . }}-write:8080/fineract-provider"
             - name: FINERACT_TENANT
               value: "default"
             - name: FINERACT_SSL_VERIFY

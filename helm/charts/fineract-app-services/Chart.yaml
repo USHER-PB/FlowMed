@@ -33,22 +33,22 @@ dependencies:
     version: "1.0.0"
     repository: "file://../payment-gateway"
     condition: payment-gateway.enabled
-    alias: paymentGateway
+    alias: payment-gateway
 
   - name: asset-service
     version: "1.0.0"
     repository: "file://../asset-service"
     condition: asset-service.enabled
-    alias: assetService
+    alias: asset-service
 
   - name: customer-self-service
     version: "1.0.0"
     repository: "file://../customer-self-service"
     condition: customer-self-service.enabled
-    alias: customerSelfService
+    alias: customer-self-service
 
   - name: sms-gateway
     version: "1.0.0"
     repository: "file://../sms-gateway"
     condition: sms-gateway.enabled
-    alias: smsGateway
+    alias: sms-gateway

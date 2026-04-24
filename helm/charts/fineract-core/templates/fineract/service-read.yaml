@@ -20,9 +20,9 @@ spec:
   type: ClusterIP
   ports:
     - port: 8080
-      targetPort: http
+      targetPort: https
       protocol: TCP
-      name: http
+      name: https
   selector:
     {{- include "fineract-core.read.selectorLabels" . | nindent 4 }}
 {{- end }}

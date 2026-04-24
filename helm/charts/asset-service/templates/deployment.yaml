@@ -99,15 +99,15 @@ spec:
                   key: db-password
             # HikariCP pool
             - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
-              value: {{ .Values.config.database.hikari.maximumPoolSize | default "20" | quote }}
+              value: {{ .Values.config.database.hikari.maximumPoolSize | default 20 | toString | quote }}
             - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
-              value: {{ .Values.config.database.hikari.minimumIdle | default "5" | quote }}
+              value: {{ .Values.config.database.hikari.minimumIdle | default 5 | toString | quote }}
             - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
-              value: {{ .Values.config.database.hikari.connectionTimeout | default "3000" | quote }}
+              value: {{ .Values.config.database.hikari.connectionTimeout | default 3000 | toString | quote }}
             - name: SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT
-              value: {{ .Values.config.database.hikari.idleTimeout | default "60000" | quote }}
+              value: {{ .Values.config.database.hikari.idleTimeout | default 60000 | toString | quote }}
             - name: SPRING_DATASOURCE_HIKARI_MAX_LIFETIME
-              value: {{ .Values.config.database.hikari.maxLifetime | default "1800000" | quote }}
+              value: {{ .Values.config.database.hikari.maxLifetime | default 1800000 | toString | quote }}
             # Redis
             {{- if .Values.config.redis.enabled }}
             - name: SPRING_DATA_REDIS_HOST
@@ -137,16 +137,7 @@ spec:
             - name: FINERACT_TENANT
               value: {{ .Values.config.fineract.tenant | default "default" | quote }}
             - name: FINERACT_AUTH_TYPE
-              value: "oauth"
-            - name: FINERACT_TOKEN_URL
-              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/token"
-            - name: FINERACT_CLIENT_ID
-              value: {{ .Values.config.keycloak.clientId | quote }}
-            - name: FINERACT_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "asset-service.secretName" . }}
-                  key: keycloak-client-secret
+              value: "basic"
             - name: FINERACT_USERNAME
               value: {{ .Values.config.fineract.username | quote }}
             - name: FINERACT_PASSWORD
@@ -169,6 +160,12 @@ spec:
               value: {{ .Values.config.glAccounts.fundSource | quote }}
             - name: GL_SAVINGS_CONTROL
               value: {{ .Values.config.glAccounts.savingsControl | quote }}
+            - name: GL_PLATFORM_FEE_PAYABLE
+              value: {{ .Values.config.glAccounts.platformFeePayable | quote }}
+            - name: GL_EXPENSE_ACCOUNT
+              value: {{ .Values.config.glAccounts.expenseAccount | quote }}
+            - name: ASSET_SERVICE_ACCOUNTING_FEE_COLLECTION_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.accounting.feeCollectionAccountExternalId | quote }}
             # LP-specific GL Account codes
             - name: GL_LP_FUND_SOURCE
               value: {{ .Values.config.lpGlAccounts.fundSource | quote }}

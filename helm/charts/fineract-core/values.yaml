@@ -92,6 +92,24 @@ database:
     connectionTimeout: 30000
 
 # =============================================================================
+# Database Initialization Job Configuration
+# =============================================================================
+
+databaseInit:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# =============================================================================
 # Redis Configuration
 # =============================================================================
 
@@ -153,6 +171,30 @@ oauth2Proxy:
     clientId: fineract-api
     # clientSecret should be set via secrets.oauth2Proxy.clientSecret
   redirectUrl: https://api.fineract.example.com/oauth2/callback
+  redis:
+    enabled: false
+    connectionUrl: ""
+    existingSecret: ""
+    secretKey: password
+
+# =============================================================================
+# Keycloak Init Job Configuration
+# =============================================================================
+
+keycloakInit:
+  enabled: false
+  url: http://keycloak:8080
+  adminUser: admin
+  realm: fineract
+  redirectUris:
+    - https://fineract.local/*
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
 # =============================================================================
 # User Sync Service Configuration
@@ -199,6 +241,9 @@ configCli:
     tenants: []
     users: []
     roles: []
+  auth:
+    tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
+    clientId: fineract-config
 
 # =============================================================================
 # Secrets Configuration
@@ -234,6 +279,11 @@ secrets:
     # Required keys: clientId, clientSecret
     # Used by: User Sync Service, OAuth2 Proxy
     secretName: fineract-keycloak-sealed
+  userSync:
+    # Name of the SealedSecret containing user-sync client credentials
+    # Required keys: clientSecret (or clientSecretKey override)
+    # Used by: User Sync Service, Keycloak init job
+    secretName: user-sync-credentials
   oauth2Proxy:
     # Name of the SealedSecret containing OAuth2 Proxy secrets
     # Required keys: clientId, clientSecret, cookieSecret

@@ -97,7 +97,15 @@ config:
     feeIncome: "<account-code>"
     fundSource: "<account-code>"
     savingsControl: "<account-code>"
+    platformFeePayable: "<account-code>"
+    expenseAccount: "<account-code>"
+  accounting:
+    feeCollectionAccountExternalId: "PLATFORM-CLEARING"
 ```
+
+The asset service also expects a Fineract savings account with the matching
+external ID to exist and be `Active`. By default that is `PLATFORM-CLEARING`,
+but you can change it here if your reference data uses a different ID.
 
 ### Tax Configuration (Cameroon/CEMAC)
 
@@ -195,6 +203,8 @@ kubectl logs -n fineract -l app.kubernetes.io/name=asset-service
 ```bash
 kubectl exec -n fineract deploy/asset-service -- curl -s http://localhost:8084/actuator/health
 ```
+
+The startup probe allows up to 10 minutes for the app to finish resolving Fineract GL accounts and payment type references. If the pod still restarts after that, check the Fineract reference data and the service connection.
 
 ### Check database connectivity
 

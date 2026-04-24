@@ -101,7 +101,7 @@ helm install fineract-apps helm/charts/fineract-app-services \
 | `global.keycloakUrl` | Keycloak internal URL | `http://keycloak:8080` |
 | `global.keycloakPublicUrl` | Keycloak public URL | `http://localhost:8180` |
 | `global.realm` | Keycloak realm | `fineract` |
-| `global.fineractUrl` | Fineract core URL | `https://fineract:8443` |
+| `global.fineractUrl` | Fineract core URL | `https://fineract-core-write:8080/fineract-provider` |
 | `global.otelEndpoint` | OpenTelemetry endpoint | `http://otel-collector:4317` |
 | `global.storage.endpoint` | MinIO/S3 endpoint | `http://minio:9000` |
 | `global.storage.bucket` | Storage bucket | `fineract-assets` |
@@ -152,6 +152,8 @@ paymentGateway:
 assetService:
   replicaCount: 1
   permitAllAdmin: true
+  accounting:
+    feeCollectionAccountExternalId: "PLATFORM-CLEARING"
 
 customerSelfService:
   replicaCount: 1

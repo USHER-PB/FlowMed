@@ -8,7 +8,7 @@ replicaCount: 1
 # Image configuration
 image:
   registry: ghcr.io
-  repository: adorsys-gis/fineract-apps/sms-gateway
+  repository: adorsys-gis/sms-gateway
   tag: "latest"
   pullPolicy: Always
 

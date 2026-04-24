@@ -11,5 +11,5 @@ dependencies:
 - name: sms-gateway
   repository: file://../sms-gateway
   version: 1.0.0
-digest: sha256:6cb4e08b37f813fbd6c3eec44d077d0f11ad9409dad45716545c30982317affb
-generated: "2026-04-23T11:23:18.846485493+01:00"
+digest: sha256:c2d166d88b12d115781021f8cef2df8d6329bde032107cb7271cb636a3ee944c
+generated: "2026-04-24T12:25:18.888422711+01:00"

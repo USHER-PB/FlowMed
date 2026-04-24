@@ -63,6 +63,8 @@ data:
             proxy_buffering on;
             proxy_buffer_size 4k;
             proxy_buffers 8 4k;
+            proxy_ssl_server_name on;
+            proxy_ssl_verify off;
 
             # Proxy headers
             proxy_set_header Host $host;
@@ -72,33 +74,33 @@ data:
 
             # Batch endpoints - route to batch service
             location ~ ^/fineract-provider/api/v1/batch {
-                proxy_pass http://fineract-batch;
+                proxy_pass https://fineract-batch;
             }
 
             # GET requests - route to read service
             location /fineract-provider/api {
                 if ($request_method = GET) {
-                    proxy_pass http://fineract-read;
+                    proxy_pass https://fineract-read;
                 }
 
                 # POST/PUT/DELETE/PATCH requests - route to write service
                 if ($request_method = POST) {
-                    proxy_pass http://fineract-write;
+                    proxy_pass https://fineract-write;
                 }
                 if ($request_method = PUT) {
-                    proxy_pass http://fineract-write;
+                    proxy_pass https://fineract-write;
                 }
                 if ($request_method = DELETE) {
-                    proxy_pass http://fineract-write;
+                    proxy_pass https://fineract-write;
                 }
                 if ($request_method = PATCH) {
-                    proxy_pass http://fineract-write;
+                    proxy_pass https://fineract-write;
                 }
             }
 
             # Default location - route to read service for health checks
             location / {
-                proxy_pass http://fineract-read;
+                proxy_pass https://fineract-read;
             }
 
             # Health check endpoint

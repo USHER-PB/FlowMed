@@ -6,8 +6,8 @@
 # -----------------------------------------------------------------------------
 global:
   # Image pull secrets for private registries
-  imagePullSecrets: []
-  # - name: ghcr-secret
+  imagePullSecrets:
+    - name: ghcr-credentials
 
   # Keycloak OAuth2 configuration
   keycloakUrl: "http://keycloak:8080"
@@ -15,14 +15,14 @@ global:
   realm: fineract
 
   # Fineract core banking URL
-  fineractUrl: "https://fineract:8443"
+  fineractUrl: "https://fineract-core-write:8080/fineract-provider"
 
   # OpenTelemetry collector endpoint
   otelEndpoint: "http://otel-collector:4317"
 
   # Storage configuration (MinIO for local, S3 for cloud)
   storage:
-    endpoint: "http://minio:9000"
+    endpoint: "http://data-store-minio:9000"
     bucket: fineract-assets
     region: us-east-1
     accessKey: minioadmin
@@ -31,12 +31,12 @@ global:
 
   # PostgreSQL connection defaults
   postgres:
-    host: postgres
+    host: data-store-postgres-rw
     port: 5432
 
   # Redis configuration
   redis:
-    host: redis
+    host: infra-cache-redis
     port: 6379
 
 # -----------------------------------------------------------------------------
@@ -53,41 +53,88 @@ networkPolicies:
 # -----------------------------------------------------------------------------
 # Payment Gateway Service
 # -----------------------------------------------------------------------------
-paymentGateway:
+payment-gateway:
   enabled: true
 
   replicaCount: 1
 
+  # Image pull secrets for private registries
+  imagePullSecrets:
+    - name: ghcr-credentials
+
   image:
-    repository: ghcr.io/adorsys-gis/fineract-apps/payment-gateway-service
-    tag: ""
-    pullPolicy: IfNotPresent
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/payment-gateway-service
+    tag: "4382f407"
+    pullPolicy: Always
 
   service:
     type: ClusterIP
     port: 8082
 
-  # Keycloak OAuth2
+  # Configuration overrides for subchart
+  config:
+    # Keycloak OAuth2
+    keycloak:
+      url: "http://keycloak:8080"
+      realm: "fineract"
+      clientId: payment-gateway
+      clientSecret: payment-gateway-secret
+      port: 8080
+
+    # Fineract connection
+    fineract:
+      url: "https://fineract-core-write:8080"
+      host: "fineract-core-write"
+      port: 8080
+      tenant: "default"
+      username: mifos
+      password: password
+      savingsProductId: "1"
+
+    # Database
+    database:
+      host: "data-store-postgres-rw"
+      port: 5432
+      url: "jdbc:postgresql://data-store-postgres-rw:5432/payment_gateway"
+      name: payment_gateway
+      username: payment_gateway
+      password: payment_gateway_password
+      hikari:
+        maximumPoolSize: "10"
+        minimumIdle: "3"
+        connectionTimeout: "5000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+
+    # Redis
+    redis:
+      enabled: true
+      host: "infra-cache-redis"
+      port: 6379
+      existingSecret: "infra-cache-redis-auth"
+
+  # Keycloak OAuth2 (legacy format)
   keycloak:
     clientId: payment-gateway
     clientSecret: payment-gateway-secret
 
-  # Fineract connection
+  # Fineract connection (legacy format)
   fineract:
     username: mifos
     password: password
     savingsProductId: "1"
 
-  # Database
+  # Database (legacy format)
   database:
     name: payment_gateway
     username: payment_gateway
     password: payment_gateway_password
 
-  # Payment providers
+  # Payment providers (disabled for development - requires real API keys)
   providers:
     mtn:
-      enabled: true
+      enabled: false
       baseUrl: "https://sandbox.momodeveloper.mtn.com"
       targetEnv: sandbox
       collectionKey: ""
@@ -97,7 +144,7 @@ paymentGateway:
       callbackUrl: ""
       glAccountCode: "5001"
     orange:
-      enabled: true
+      enabled: false
       baseUrl: "https://api.orange.com/orange-money-webpay/dev/v1"
       clientId: ""
       clientSecret: ""
@@ -137,86 +184,145 @@ paymentGateway:
     targetCPUUtilizationPercentage: 70
 
   # Use existing secret
-  existingSecret: ""
+  existingSecret: "payment-gateway-credentials"
 
 # -----------------------------------------------------------------------------
 # Asset Service
 # -----------------------------------------------------------------------------
-assetService:
+asset-service:
   enabled: true
 
   replicaCount: 1
 
+  # Image pull secrets for private registries
+  imagePullSecrets:
+    - name: ghcr-credentials
+
   image:
-    repository: ghcr.io/adorsys-gis/fineract-apps/asset-service
-    tag: ""
-    pullPolicy: IfNotPresent
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/asset-service
+    tag: "768042b0"
+    pullPolicy: Always
 
   service:
     type: ClusterIP
     port: 8083
     managementPort: 8084
 
-  # Keycloak OAuth2
+  # Configuration overrides for subchart
+  config:
+    # Keycloak OAuth2
+    keycloak:
+      url: "http://keycloak:8080"
+      realm: "fineract"
+      clientId: asset-service
+      clientSecret: asset-service-secret
+      port: 8080
+
+    # Fineract connection
+    fineract:
+      url: "https://fineract-core-write:8080"
+      host: "fineract-core-write"
+      port: 8080
+      tenant: "default"
+      username: "mifos"
+      password: fineract_dev_password
+
+    # Database
+    database:
+      host: "data-store-postgres-rw"
+      port: 5432
+      url: "jdbc:postgresql://data-store-postgres-rw:5432/asset_service"
+      name: asset_service
+      username: asset_service
+      password: asset_service_password
+      hikari:
+        maximumPoolSize: "20"
+        minimumIdle: "5"
+        connectionTimeout: "3000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+
+    # Redis
+    redis:
+      enabled: true
+      host: "infra-cache-redis"
+      port: 6379
+      existingSecret: "infra-cache-redis-auth"
+
+    # GL Account codes (SYSCOHADA-aligned)
+    glAccounts:
+      digitalAssetInventory: "301"
+      customerDigitalAssetHoldings: "4102"
+      transfersInSuspense: "4501"
+      savingsControl: "4101"
+      incomeFromInterest: "701"
+      feeIncome: "701"
+      fundSource: "502"
+      platformFeePayable: "4201"
+      expenseAccount: "601"
+
+    accounting:
+      feeCollectionAccountExternalId: "PLATFORM-CLEARING"
+
+    # LP-specific GL Account codes
+    lpGlAccounts:
+      fundSource: "5011"
+      savingsControl: "4011"
+      spreadPayable: "4012"
+      taxWithholding: "4013"
+      transfersInSuspense: "4501"
+
+    # LP savings product short names
+    lpSavingsProductShortName: "LSAV"
+    lpSpreadProductShortName: "LSPD"
+    lpTaxProductShortName: "LTAX"
+
+    # Tax configuration (Cameroon/CEMAC)
+    tax:
+      authorityExternalId: "TAX-AUTHORITY"
+      registrationDutyAccountExternalId: "TAX-REG-DUTY"
+      ircmAccountExternalId: "TAX-IRCM"
+      capitalGainsAccountExternalId: "TAX-CAP-GAINS"
+      tvaAccountExternalId: "TAX-TVA"
+      defaultRegistrationDutyRate: "0.02"
+      defaultIrcmDividendRate: "0.165"
+      defaultIrcmBvmacRate: "0.11"
+      defaultIrcmBondRate: "0.055"
+      defaultCapitalGainsRate: "0.165"
+      defaultTvaRate: "0.1925"
+      capitalGainsAnnualExemption: "500000"
+
+    assetIssuancePaymentType: "Asset Issuance"
+
+    # Market hours
+    marketHours:
+      open: "00:00"
+      close: "23:59"
+      weekendTradingEnabled: true
+
+    # Security
+    security:
+      permitAllAdmin: "false"
+      corsAllowedOrigins: "http://localhost:4209,http://localhost:3000,http://localhost:5173,http://localhost:8080"
+
+    # Rate limiting
+    rateLimitEnabled: "true"
+
+  # Keycloak OAuth2 (legacy format)
   keycloak:
     clientId: asset-service
     clientSecret: asset-service-secret
 
-  # Fineract connection
+  # Fineract connection (legacy format)
   fineract:
     password: fineract_dev_password
 
-  # Database
+  # Database (legacy format)
   database:
     name: asset_service
     username: asset_service
     password: asset_service_password
-
-  # GL Account codes (SYSCOHADA-aligned)
-  gl:
-    digitalAssetInventory: "301"
-    customerDigitalAssetHoldings: "4102"
-    transfersInSuspense: "4501"
-    savingsControl: "4101"
-    incomeFromInterest: "701"
-    feeIncome: "701"
-    fundSource: "502"
-
-  # LP-specific GL Account codes
-  lpGl:
-    fundSource: "5011"
-    savingsControl: "4011"
-    spreadPayable: "4012"
-    taxWithholding: "4013"
-    transfersInSuspense: "4501"
-
-  # LP savings product short names
-  lpSavingsProductShortName: "LSAV"
-  lpSpreadProductShortName: "LSPD"
-  lpTaxProductShortName: "LTAX"
-
-  # Tax configuration (Cameroon/CEMAC)
-  tax:
-    authorityExternalId: "TAX-AUTHORITY"
-    registrationDutyAccountExternalId: "TAX-REG-DUTY"
-    ircmAccountExternalId: "TAX-IRCM"
-    capitalGainsAccountExternalId: "TAX-CAP-GAINS"
-    tvaAccountExternalId: "TAX-TVA"
-    defaultRegistrationDutyRate: "0.02"
-    defaultIrcmDividendRate: "0.165"
-    defaultIrcmBvmacRate: "0.11"
-    defaultIrcmBondRate: "0.055"
-    defaultCapitalGainsRate: "0.165"
-    defaultTvaRate: "0.1925"
-    capitalGainsAnnualExemption: "500000"
-
-  assetIssuancePaymentType: "Asset Issuance"
-
-  # Market hours
-  marketHours:
-    open: "00:00"
-    close: "23:59"
-    weekendTradingEnabled: true
 
   # JVM options
   javaOpts: "-Xmx320m -Xms160m"
@@ -238,59 +344,98 @@ assetService:
     maxReplicas: 3
     targetCPUUtilizationPercentage: 70
 
-  # Security
-  permitAllAdmin: false
-  corsAllowedOrigins: "http://localhost:4209,http://localhost:3000,http://localhost:5173,http://localhost:8080"
-
-  # Rate limiting
-  rateLimitEnabled: "true"
-
   # Tracing
   tracing:
     samplingProbability: "1.0"
 
   # Use existing secret
-  existingSecret: ""
+  existingSecret: "asset-service-credentials"
 
 # -----------------------------------------------------------------------------
 # Customer Self-Service
 # -----------------------------------------------------------------------------
-customerSelfService:
+customer-self-service:
   enabled: true
 
   replicaCount: 1
 
+  # Image pull secrets for private registries
+  imagePullSecrets:
+    - name: ghcr-credentials
+
   image:
-    repository: ghcr.io/adorsys-gis/fineract-apps/customer-self-service
-    tag: ""
-    pullPolicy: IfNotPresent
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/customer-self-service
+    tag: "169deecc"
+    pullPolicy: Always
 
   service:
     type: ClusterIP
     port: 8080
 
-  # Keycloak OAuth2
+  # Configuration overrides for subchart
+  config:
+    # Keycloak OAuth2
+    keycloak:
+      url: "http://keycloak:8080"
+      realm: "fineract"
+      clientId: customer-registration
+      clientSecret: customer-registration-secret
+      port: 8080
+
+    # Fineract connection
+    fineract:
+      url: "https://fineract-core-write:8080"
+      host: "fineract-core-write"
+      port: 8080
+      tenant: "default"
+      username: mifos
+      password: password
+
+    # Database
+    database:
+      host: "data-store-postgres-rw"
+      port: 5432
+      url: "jdbc:postgresql://data-store-postgres-rw:5432/customer_registration"
+      name: customer_registration
+      username: customer_reg
+      password: customer_reg_password
+      hikari:
+        maximumPoolSize: "10"
+        minimumIdle: "3"
+        connectionTimeout: "5000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+
+    # KYC configuration
+    kyc:
+      defaultOfficeId: "1"
+      defaultGroupPath: "/self-service-customers"
+      defaultKycTier: "1"
+      defaultKycStatus: pending
+
+    # Redis configuration
+    redis:
+      enabled: true
+      host: "infra-cache-redis"
+      port: 6379
+      existingSecret: "infra-cache-redis-auth"
+
+  # Keycloak OAuth2 (legacy format)
   keycloak:
     clientId: customer-registration
     clientSecret: customer-registration-secret
 
-  # Database
+  # Database (legacy format)
   database:
     name: customer_registration
     username: customer_reg
     password: customer_reg_password
 
-  # Fineract connection
+  # Fineract connection (legacy format)
   fineract:
     username: mifos
     password: password
-
-  # KYC configuration
-  config:
-    defaultOfficeId: "1"
-    defaultGroupPath: "/self-service-customers"
-    defaultKycTier: "1"
-    defaultKycStatus: pending
 
   # JVM options
   javaOpts: "-Xmx160m -Xms80m"
@@ -316,20 +461,25 @@ customerSelfService:
     samplingProbability: "1.0"
 
   # Use existing secret
-  existingSecret: ""
+  existingSecret: "customer-self-service-credentials"
 
 # -----------------------------------------------------------------------------
 # SMS Gateway
 # -----------------------------------------------------------------------------
-smsGateway:
+sms-gateway:
   enabled: true
 
   replicaCount: 1
 
+  # Image pull secrets for private registries
+  imagePullSecrets:
+    - name: ghcr-credentials
+
   image:
-    repository: ghcr.io/adorsys-gis/fineract-apps/sms-gateway
-    tag: ""
-    pullPolicy: IfNotPresent
+    registry: ghcr.io
+    repository: adorsys-gis/sms-gateway
+    tag: "latest"
+    pullPolicy: Always
 
   service:
     type: ClusterIP
@@ -338,11 +488,11 @@ smsGateway:
   # Application configuration
   config:
     database:
-      host: postgres
+      host: data-store-postgres-rw
       port: 5432
       name: user_storage
     storage:
-      endpoint: "http://minio:9000"
+      endpoint: "http://data-store-minio:9000"
       bucket: sms-storage
     sms:
       provider: avlytext
@@ -378,7 +528,7 @@ smsGateway:
     targetCPUUtilizationPercentage: 70
 
   # Use existing secret
-  existingSecret: ""
+  existingSecret: "sms-gateway-credentials"
 
 # -----------------------------------------------------------------------------
 # Service Account (shared)
