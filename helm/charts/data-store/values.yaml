@@ -95,6 +95,20 @@ postgres:
       enablePodAntiAffinity: true
       podAntiAffinityType: "preferred"
       topologyKey: "kubernetes.io/hostname"
+    # Bootstrap configuration for initial cluster setup
+    # These SQL commands run only during initial cluster creation
+    # For existing clusters, use the database-init job in fineract-core chart
+    bootstrap:
+      initdb:
+        # Grant CREATEDB privilege to appuser for database-init job
+        # This allows the database-init job to create databases
+        postInitSQL:
+          - "ALTER ROLE appuser CREATEDB;"
+        # Additional databases to create during bootstrap
+        # Uses postInitApplicationSQL to create databases with appuser as owner
+        postInitApplicationSQL:
+          - "CREATE DATABASE fineract_tenants OWNER appuser;"
+          - "CREATE DATABASE fineract_default OWNER appuser;"
 
 # =============================================================================
 # MinIO Configuration
