@@ -8,7 +8,7 @@ global:
     enabled: false
 
 secrets:
-  mode: generate  # "generate" for infra-first deployment, "existing" when service secrets exist
+  mode: existing  # "generate" for infra-first deployment, "existing" when service secrets exist
 
 # PostgreSQL connection info (Keycloak does NOT own PostgreSQL — it lives in fineract namespace)
 postgres:
