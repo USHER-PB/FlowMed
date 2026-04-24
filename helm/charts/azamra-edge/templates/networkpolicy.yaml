@@ -31,7 +31,7 @@ spec:
         - protocol: TCP
           port: {{ .Values.userStorage.port }}
 ---
-# Allow user-storage to reach external HTTPS endpoints (e.g. Keycloak OIDC discovery / JWKS)
+# Allow user-storage to reach postgres, redis, and external HTTPS endpoints
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -46,7 +46,35 @@ spec:
   policyTypes:
     - Egress
   egress:
-    - ports:
+    # DNS resolution (required for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL access
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: data-store-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Redis access
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: infra-cache
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # External HTTPS endpoints (e.g. Keycloak OIDC discovery / JWKS)
+    - to:
+        - namespaceSelector: {}
+      ports:
         - protocol: TCP
           port: 443
 ---
@@ -75,6 +103,53 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.azamraBff.port }}
+---
+# Allow azamra-bff to reach user-storage, redis, and external HTTPS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-azamra-bff-external
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: azamra-bff
+  policyTypes:
+    - Egress
+  egress:
+    # DNS resolution (required for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # User-storage access
+    - to:
+        - podSelector:
+            matchLabels:
+              app: user-storage
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Redis access
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: infra-cache
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # External HTTPS (Keycloak OIDC, etc.)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
 {{- if .Values.azamraKycManager.enabled }}
 ---
 # Allow traffic to azamra-kyc-manager from ingress-nginx controller only
@@ -103,7 +178,7 @@ spec:
         - protocol: TCP
           port: {{ .Values.azamraKycManager.port }}
 ---
-# Allow KYC manager to reach external HTTPS (Keycloak OIDC discovery, public issuer)
+# Allow KYC manager to reach user-storage, redis, and external HTTPS
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -118,7 +193,35 @@ spec:
   policyTypes:
     - Egress
   egress:
-    - ports:
+    # DNS resolution (required for service discovery)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # User-storage access
+    - to:
+        - podSelector:
+            matchLabels:
+              app: user-storage
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Redis access
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: infra-cache
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # External HTTPS (Keycloak OIDC discovery, public issuer)
+    - to:
+        - namespaceSelector: {}
+      ports:
         - protocol: TCP
           port: 443
 {{- end }}

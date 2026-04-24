@@ -78,7 +78,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.azamraKycManager.redis.existingSecret }}
-                  key: REDIS_PASSWORD
+                  key: redis-password
             - name: REDIS_URL
               value: "redis://:$(REDIS_PASSWORD)@{{ .Values.azamraKycManager.redis.host }}:{{ .Values.azamraKycManager.redis.port }}"
             {{- else }}

@@ -92,7 +92,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.azamraBff.redis.existingSecret }}
-                  key: REDIS_PASSWORD
+                  key: redis-password
             {{- else }}
             - name: SPRING_DATA_REDIS_PASSWORD
               value: {{ .Values.azamraBff.redis.password | quote }}

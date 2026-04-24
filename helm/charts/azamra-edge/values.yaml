@@ -6,7 +6,7 @@ fullnameOverride: ""
 
 # Secrets configuration
 secrets:
-  mode: generate  # "generate" for local dev, "existing" for K8s with sealed secrets
+  mode: existing  # "generate" for local dev, "existing" for K8s with sealed secrets
 
 # Network policies
 networkPolicies:
@@ -14,9 +14,10 @@ networkPolicies:
 
 # Global settings
 global:
-  imagePullSecrets: []
+  imagePullSecrets:
+    - name: ghcr-credentials
   keycloakUrl: "http://keycloak:8080"
-  keycloakPublicUrl: "http://localhost:8180"
+  keycloakPublicUrl: "http://auth.fineract.local"
   realm: fineract
   otelEndpoint: "http://otel-collector:4317"
 
@@ -27,22 +28,23 @@ azamraBff:
   enabled: true
   image:
     repository: ghcr.io/skyengpro/azamra-tokenization-bff
-    tag: "develop-arm"  # Use "develop-amd" for amd64 (Hetzner K3s)
+    tag: "develop-amd"  # AMD64 for Hetzner K3s
   port: 8080
   replicas: 1
   keycloak:
     issuerUri: ""  # Leave empty to use global keycloakPublicUrl + realm
     jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
   services:
-    assetServiceUrl: "http://asset-service:8083/api/v1"
-    cussUrl: "http://customer-self-service:8080"
+    assetServiceUrl: "http://fineract-app-services-asset-service:8083/api/v1"
+    cussUrl: "http://fineract-app-services-customer-self-service:8080"
     userStorageUrl: "http://user-storage:3000/bff"
-    paymentGatewayUrl: "http://payment-gateway-service:8082"
+    paymentGatewayUrl: "http://fineract-app-services-payment-gateway:8082"
   ingress:
-    enabled: false
+    enabled: true
     className: nginx
-    host: ""
-    annotations: {}
+    host: "bff.fineract.local"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
     tls:
       enabled: false
       secretName: ""
@@ -55,10 +57,10 @@ azamraBff:
   kyc:
     whatsappLink: "https://wa.link/jprtzd"
   redis:
-    host: redis
+    host: infra-cache-redis
     port: "6379"
     password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
-    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
   resources:
     requests:
       memory: "256Mi"
@@ -74,11 +76,11 @@ azamraKycManager:
   enabled: true
   image:
     repository: ghcr.io/skyengpro/azamra-tokenization-frontend-kyc-mgr
-    tag: "latest-arm"
+    tag: "latest-amd"  # AMD64 for Hetzner K3s
   port: 3000
   replicas: 1
-  existingSecret: ""  # Set to "kyc-manager-credentials" for K8s with sealed secrets
-  nextAuthUrl: ""  # Set per environment (e.g. https://kyc.dev.azamra.capital)
+  existingSecret: "kyc-manager-credentials"  # SealedSecret for KYC Manager
+  nextAuthUrl: "http://kyc.fineract.local"
   oauth2:
     issuer: ""  # Leave empty to use global keycloakPublicUrl + realm
     clientId: "kyc-manager"
@@ -87,18 +89,19 @@ azamraKycManager:
     providerId: "keycloak"
   apiUrl: "http://user-storage:3000"
   ingress:
-    enabled: false
+    enabled: true
     className: nginx
-    host: kyc.localhost
-    annotations: {}
+    host: "kyc.fineract.local"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
     tls:
       enabled: false
       secretName: ""
   redis:
-    host: redis
+    host: infra-cache-redis
     port: "6379"
     password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
-    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
   resources:
     requests:
       memory: "128Mi"
@@ -112,32 +115,34 @@ azamraKycManager:
 # ---------------------------------------------------------------------------
 userStorage:
   enabled: true
+  initDatabase:
+    enabled: true  # Enable init-db-job to create database
   image:
     repository: ghcr.io/adorsys-gis/user-storage
-    tag: "master-arm64"
+    tag: "master"  # Uses multi-arch image
   port: 3000
   replicas: 1
-  existingSecret: ""  # Set to "user-storage-credentials" for K8s with sealed secrets
+  existingSecret: "user-storage-credentials"  # SealedSecret for user-storage
   database:
-    url: ""  # REQUIRED: Set database URL with credentials, e.g. postgres://user:pass@host:5432/db
+    url: ""  # Not used when existingSecret is set
     poolSize: 15
   redis:
-    url: "redis://redis:6379"
-    existingSecret: ""  # Set to "fineract-redis-credentials" for K8s with sealed secrets
+    url: ""  # Not used when existingSecret is set
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
   minio:
-    endpoint: "http://minio:9000"
+    endpoint: "http://data-store-minio:9000"
     region: "us-east-1"
-    accessKey: ""  # REQUIRED: Set MinIO access key for dev, or use existingSecret for K8s
-    secretKey: ""  # REQUIRED: Set MinIO secret key for dev, or use existingSecret for K8s
-    bucket: "user-storage-dev"
-    existingSecret: ""  # Set to "data-store-minio" for K8s with sealed secrets
+    accessKey: ""  # Not used when existingSecret is set
+    secretKey: ""  # Not used when existingSecret is set
+    bucket: "user-storage"
+    existingSecret: "data-store-minio"  # MinIO credentials secret
   oauth2:
     issuer: ""  # Leave empty to use global keycloakUrl + realm
     jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
   kc:
     enabled: true
     basePath: "/kc"
-    signatureSecret: ""  # REQUIRED: Set KC signature secret for production
+    signatureSecret: ""  # Set via existingSecret (KC_SIGNATURE_SECRET)
     maxClockSkewSeconds: 60
     maxBodyBytes: 262144
   bff:
@@ -147,9 +152,9 @@ userStorage:
     enabled: true
     basePath: "/staff"
   cuss:
-    apiUrl: "http://customer-self-service:8080"
-    clientSecret: ""  # REQUIRED: Set CUSS client secret for dev, or use existingSecret for K8s
-    existingSecret: ""  # Set to "customer-self-service-credentials" for K8s with sealed secrets
+    apiUrl: "http://fineract-app-services-customer-self-service:8080"
+    clientSecret: ""  # Not used when existingSecret is set
+    existingSecret: ""  # Optional: separate secret for CUSS client
   sms:
     provider: "api"
     apiBaseUrl: ""
