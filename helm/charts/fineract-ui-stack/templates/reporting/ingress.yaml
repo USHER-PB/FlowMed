@@ -1,0 +1,42 @@
+{{/*
+=============================================================================
+Reporting Ingress Template
+=============================================================================
+Ingress for Reporting UI application with TLS and cert-manager
+Requirements: 7.4, 9.1, 9.2, 9.3, 9.4, 9.5
+=============================================================================
+*/}}
+{{- if and .Values.reporting.enabled .Values.reporting.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-reporting
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "reporting") | nindent 4 }}
+  annotations:
+    {{- if and .Values.reporting.tls.enabled .Values.reporting.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.reporting.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.reporting.ingress.annotations }}
+    {{- toYaml .Values.reporting.ingress.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.reporting.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.reporting.hostname }}
+      secretName: {{ .Values.reporting.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.reporting.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fineract-ui-stack.fullname" . }}-reporting
+                port:
+                  number: 80
+{{- end }}

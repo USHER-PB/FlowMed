@@ -1,0 +1,30 @@
+apiVersion: v2
+name: fineract-ui-stack
+description: |
+  Helm chart for deploying Apache Fineract UI applications (Wave 7).
+  Deploys 10 frontend applications: Portal, Web App, Admin, Self-Service,
+  Account Management, Accounting, Reporting, Branch, Cashier, and Asset.
+
+type: application
+version: 1.0.0
+appVersion: "1.8.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - fineract
+  - banking
+  - ui
+  - frontend
+  - microservices
+  - wave7
+
+home: https://github.com/apache/fineract
+sources:
+  - https://github.com/apache/fineract
+
+annotations:
+  category: Application
+  wave: "7"

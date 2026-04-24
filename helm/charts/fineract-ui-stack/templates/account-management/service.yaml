@@ -1,0 +1,25 @@
+{{/*
+=============================================================================
+Account Management Service Template
+=============================================================================
+ClusterIP service for Account Management UI application
+Requirements: 7.3
+=============================================================================
+*/}}
+{{- if .Values.accountManagement.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-account-management
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "account-management") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "account-management") | nindent 4 }}
+{{- end }}

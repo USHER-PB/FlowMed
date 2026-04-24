@@ -1,0 +1,19 @@
+{{/*
+ =============================================================================
+ Account Management ConfigMap Template
+ =============================================================================
+ ConfigMap containing nginx config for Account Management UI application
+ Requirements: 8.1, 8.2, 8.3, 8.4, 8.6
+ =============================================================================
+ */}}
+{{- if .Values.accountManagement.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fineract-ui-stack.fullname" . }}-account-management-nginx
+  labels:
+    {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "account-management") | nindent 4 }}
+data:
+  default.conf: |
+{{ .Files.Get "files/frontend-default.conf" | indent 4 }}
+{{- end }}

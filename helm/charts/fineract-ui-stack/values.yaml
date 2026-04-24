@@ -1,0 +1,291 @@
+# =============================================================================
+# Fineract UI Stack Helm Chart - Default Values
+# =============================================================================
+# This chart deploys 10 UI applications for Apache Fineract.
+# Each application can be individually enabled/disabled.
+# =============================================================================
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+global:
+  domain: example.com
+  apiEndpoint: https://api.fineract.example.com
+  keycloak:
+    url: https://keycloak.example.com
+    realm: fineract
+
+# =============================================================================
+# Common UI Configuration
+# =============================================================================
+
+ui:
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  replicaCount: 2
+
+# =============================================================================
+# Portal Application
+# =============================================================================
+
+portal:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/portal-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: portal.fineract.example.com
+  keycloak:
+    clientId: fineract-portal
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: portal-tls
+
+# =============================================================================
+# Web App Application
+# =============================================================================
+
+webApp:
+  enabled: false
+  image:
+    repository: fineract/web-app-ui
+    tag: "1.0.0"
+  hostname: app.fineract.example.com
+  keycloak:
+    clientId: fineract-web-app
+  tls:
+    enabled: true
+    secretName: web-app-tls
+
+# =============================================================================
+# Admin Application
+# =============================================================================
+
+admin:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/admin-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: admin.fineract.example.com
+  keycloak:
+    clientId: fineract-admin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: admin-tls
+
+# =============================================================================
+# Self-Service Application
+# =============================================================================
+
+selfService:
+  enabled: false
+  image:
+    repository: fineract/self-service-ui
+    tag: "1.0.0"
+  hostname: selfservice.fineract.example.com
+  keycloak:
+    clientId: fineract-self-service
+  tls:
+    enabled: true
+    secretName: self-service-tls
+
+# =============================================================================
+# Account Management Application
+# =============================================================================
+
+accountManagement:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/account-management-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: accounts.fineract.example.com
+  keycloak:
+    clientId: fineract-account-management
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: account-management-tls
+
+# =============================================================================
+# Accounting Application
+# =============================================================================
+
+accounting:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/accounting-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: accounting.fineract.example.com
+  keycloak:
+    clientId: fineract-accounting
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: accounting-tls
+
+# =============================================================================
+# Reporting Application
+# =============================================================================
+
+reporting:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/reporting-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: reports.fineract.example.com
+  keycloak:
+    clientId: fineract-reporting
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: reporting-tls
+
+# =============================================================================
+# Branch Application
+# =============================================================================
+
+branch:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/branch-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: branch.fineract.example.com
+  keycloak:
+    clientId: fineract-branch
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: branch-tls
+
+# =============================================================================
+# Cashier Application
+# =============================================================================
+
+cashier:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/cashier-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: cashier.fineract.example.com
+  keycloak:
+    clientId: fineract-cashier
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: cashier-tls
+
+# =============================================================================
+# Asset Application
+# =============================================================================
+
+asset:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fineract/asset-ui
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  hostname: assets.fineract.example.com
+  keycloak:
+    clientId: fineract-asset
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: asset-tls
