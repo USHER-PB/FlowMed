@@ -1,0 +1,241 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "customer-self-service.fullname" . }}
+  labels:
+    {{- include "customer-self-service.labels" . | nindent 4 }}
+  {{- with (include "customer-self-service.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "customer-self-service.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "customer-self-service.podAnnotations" . | nindent 8 }}
+      labels:
+        {{- include "customer-self-service.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "customer-self-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers.waitForDependencies.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              ATTEMPT=0; MAX={{ .Values.initContainers.waitForDependencies.maxAttempts }}
+              until nc -z {{ .Values.config.database.host }} {{ .Values.config.database.port }} 2>/dev/null; do
+                ATTEMPT=$((ATTEMPT+1))
+                if [ $ATTEMPT -ge $MAX ]; then echo "ERROR: postgres not ready after $((MAX*5))s"; exit 1; fi
+                echo "waiting for postgres ($ATTEMPT/$MAX)..."; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+        - name: wait-for-fineract
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.config.fineract.host }} {{ .Values.config.fineract.port }} 2>/dev/null; do
+                echo "waiting for fineract"; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: {{ include "customer-self-service.name" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "customer-self-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            # Keycloak
+            - name: KEYCLOAK_URL
+              value: {{ .Values.config.keycloak.url | quote }}
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.config.keycloak.realm | quote }}
+            - name: KEYCLOAK_ADMIN_REALM
+              value: "master"
+            - name: KEYCLOAK_CLIENT_ID
+              value: {{ .Values.config.keycloak.clientId | quote }}
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-self-service.secretName" . }}
+                  key: keycloak-client-secret
+            # JWT
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}"
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/certs"
+            # Fineract API
+            - name: FINERACT_URL
+              value: {{ .Values.config.fineract.url | quote }}
+            - name: FINERACT_TOKEN_URL
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/token"
+            - name: FINERACT_AUTH_TYPE
+              value: "basic"
+            - name: FINERACT_CLIENT_ID
+              value: {{ .Values.config.keycloak.clientId | default "customer-registration" | quote }}
+            - name: FINERACT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-self-service.secretName" . }}
+                  key: keycloak-client-secret
+            - name: FINERACT_OAUTH_GRANT_TYPE
+              value: "client_credentials"
+            - name: FINERACT_TENANT
+              value: {{ .Values.config.fineract.tenant | default "default" | quote }}
+            - name: FINERACT_USERNAME
+              value: {{ .Values.config.fineract.username | quote }}
+            - name: FINERACT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-self-service.secretName" . }}
+                  key: fineract-password
+            # Self-Service Config
+            - name: DEFAULT_OFFICE_ID
+              value: {{ .Values.config.selfService.defaultOfficeId | quote }}
+            - name: DEFAULT_GROUP_PATH
+              value: {{ .Values.config.selfService.defaultGroupPath | quote }}
+            - name: DEFAULT_KYC_TIER
+              value: {{ .Values.config.selfService.defaultKycTier | quote }}
+            - name: DEFAULT_KYC_STATUS
+              value: {{ .Values.config.selfService.defaultKycStatus | quote }}
+            # Database
+            - name: SPRING_DATASOURCE_URL
+              value: {{ .Values.config.database.url | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.config.database.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-self-service.secretName" . }}
+                  key: db-password
+            # Redis
+            {{- if .Values.config.redis.enabled }}
+            - name: SPRING_DATA_REDIS_HOST
+              value: {{ .Values.config.redis.host | quote }}
+            - name: SPRING_DATA_REDIS_PORT
+              value: {{ .Values.config.redis.port | quote }}
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.redis.existingSecret | default (include "customer-self-service.secretName" .) }}
+                  key: redis-password
+            {{- end }}
+            # Spring Boot
+            - name: SERVER_PORT
+              value: {{ .Values.service.targetPort | quote }}
+            - name: SPRING_MAIN_LAZY_INITIALIZATION
+              value: "true"
+            # JVM Options
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.javaOpts | default "-Xmx160m -Xms80m" }} -XX:+UseContainerSupport -XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+            # Actuator / Prometheus metrics
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus,threaddump"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            # Structured logging
+            - name: LOGGING_PATTERN_CONSOLE
+              value: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+            # Tracing
+            {{- if .Values.tracing.enabled }}
+            - name: MANAGEMENT_TRACING_ENABLED
+              value: "true"
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: {{ .Values.tracing.samplingProbability | default "1.0" | quote }}
+            - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+              value: "{{ .Values.tracing.otelEndpoint }}:4318/v1/traces"
+            - name: OTEL_SERVICE_NAME
+              value: "customer-self-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.otelEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.httpGet.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpVolumeSizeLimit | default "256Mi" }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

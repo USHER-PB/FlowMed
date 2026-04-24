@@ -1,0 +1,28 @@
+apiVersion: v2
+name: sms-gateway
+description: |
+  SMS Gateway Service for Fineract platform.
+  Handles SMS notifications via multiple providers (AvlyText, Orange SMS).
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - sms
+  - gateway
+  - notifications
+  - messaging
+  - fineract
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Application
+  wave: "5"

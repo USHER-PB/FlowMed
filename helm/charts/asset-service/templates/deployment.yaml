@@ -1,0 +1,337 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "asset-service.fullname" . }}
+  labels:
+    {{- include "asset-service.labels" . | nindent 4 }}
+  {{- with (include "asset-service.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "asset-service.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "asset-service.podAnnotations" . | nindent 8 }}
+      labels:
+        {{- include "asset-service.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "asset-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers.waitForDependencies.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              ATTEMPT=0; MAX={{ .Values.initContainers.waitForDependencies.maxAttempts }}
+              until nc -z {{ .Values.config.database.host }} {{ .Values.config.database.port }} 2>/dev/null; do
+                ATTEMPT=$((ATTEMPT+1))
+                if [ $ATTEMPT -ge $MAX ]; then echo "ERROR: postgres not ready after $((MAX*5))s"; exit 1; fi
+                echo "waiting for postgres ($ATTEMPT/$MAX)..."; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+        - name: wait-for-fineract
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.config.fineract.host }} {{ .Values.config.fineract.port }} 2>/dev/null; do
+                echo "waiting for fineract"; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: {{ include "asset-service.name" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "asset-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            {{- if .Values.management.port }}
+            - name: management
+              containerPort: {{ .Values.management.port }}
+              protocol: TCP
+            {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            # Database
+            - name: SPRING_DATASOURCE_URL
+              value: {{ .Values.config.database.url | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.config.database.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "asset-service.secretName" . }}
+                  key: db-password
+            # HikariCP pool
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              value: {{ .Values.config.database.hikari.maximumPoolSize | default 20 | toString | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              value: {{ .Values.config.database.hikari.minimumIdle | default 5 | toString | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+              value: {{ .Values.config.database.hikari.connectionTimeout | default 3000 | toString | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT
+              value: {{ .Values.config.database.hikari.idleTimeout | default 60000 | toString | quote }}
+            - name: SPRING_DATASOURCE_HIKARI_MAX_LIFETIME
+              value: {{ .Values.config.database.hikari.maxLifetime | default 1800000 | toString | quote }}
+            # Redis
+            {{- if .Values.config.redis.enabled }}
+            - name: SPRING_DATA_REDIS_HOST
+              value: {{ .Values.config.redis.host | quote }}
+            - name: SPRING_DATA_REDIS_PORT
+              value: {{ .Values.config.redis.port | quote }}
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.redis.existingSecret | default (include "asset-service.secretName" .) }}
+                  key: redis-password
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_ACTIVE
+              value: {{ .Values.config.redis.pool.maxActive | default "20" | quote }}
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_IDLE
+              value: {{ .Values.config.redis.pool.maxIdle | default "10" | quote }}
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MIN_IDLE
+              value: {{ .Values.config.redis.pool.minIdle | default "2" | quote }}
+            {{- end }}
+            # Keycloak
+            - name: KEYCLOAK_ISSUER_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}"
+            - name: KEYCLOAK_JWK_SET_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/certs"
+            # Fineract API
+            - name: FINERACT_URL
+              value: {{ .Values.config.fineract.url | quote }}
+            - name: FINERACT_TENANT
+              value: {{ .Values.config.fineract.tenant | default "default" | quote }}
+            - name: FINERACT_AUTH_TYPE
+              value: "basic"
+            - name: FINERACT_USERNAME
+              value: {{ .Values.config.fineract.username | quote }}
+            - name: FINERACT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "asset-service.secretName" . }}
+                  key: fineract-password
+            # GL Account codes (SYSCOHADA-aligned)
+            - name: GL_DIGITAL_ASSET_INVENTORY
+              value: {{ .Values.config.glAccounts.digitalAssetInventory | quote }}
+            - name: GL_CUSTOMER_DIGITAL_ASSET_HOLDINGS
+              value: {{ .Values.config.glAccounts.customerDigitalAssetHoldings | quote }}
+            - name: GL_TRANSFERS_IN_SUSPENSE
+              value: {{ .Values.config.glAccounts.transfersInSuspense | quote }}
+            - name: GL_INCOME_FROM_INTEREST
+              value: {{ .Values.config.glAccounts.incomeFromInterest | quote }}
+            - name: GL_FEE_INCOME
+              value: {{ .Values.config.glAccounts.feeIncome | quote }}
+            - name: GL_FUND_SOURCE
+              value: {{ .Values.config.glAccounts.fundSource | quote }}
+            - name: GL_SAVINGS_CONTROL
+              value: {{ .Values.config.glAccounts.savingsControl | quote }}
+            - name: GL_PLATFORM_FEE_PAYABLE
+              value: {{ .Values.config.glAccounts.platformFeePayable | quote }}
+            - name: GL_EXPENSE_ACCOUNT
+              value: {{ .Values.config.glAccounts.expenseAccount | quote }}
+            - name: ASSET_SERVICE_ACCOUNTING_FEE_COLLECTION_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.accounting.feeCollectionAccountExternalId | quote }}
+            # LP-specific GL Account codes
+            - name: GL_LP_FUND_SOURCE
+              value: {{ .Values.config.lpGlAccounts.fundSource | quote }}
+            - name: GL_LP_SAVINGS_CONTROL
+              value: {{ .Values.config.lpGlAccounts.savingsControl | quote }}
+            - name: GL_LP_SPREAD_PAYABLE
+              value: {{ .Values.config.lpGlAccounts.spreadPayable | quote }}
+            - name: GL_LP_TAX_WITHHOLDING
+              value: {{ .Values.config.lpGlAccounts.taxWithholding | quote }}
+            - name: GL_LP_TRANSFERS_IN_SUSPENSE
+              value: {{ .Values.config.lpGlAccounts.transfersInSuspense | quote }}
+            # LP savings product short names
+            - name: LP_SAVINGS_PRODUCT_SHORT_NAME
+              value: {{ .Values.config.lpSavingsProductShortName | quote }}
+            - name: LP_SPREAD_PRODUCT_SHORT_NAME
+              value: {{ .Values.config.lpSpreadProductShortName | quote }}
+            - name: LP_TAX_PRODUCT_SHORT_NAME
+              value: {{ .Values.config.lpTaxProductShortName | quote }}
+            # Tax configuration (Cameroon/CEMAC)
+            - name: TAX_AUTHORITY_EXTERNAL_ID
+              value: {{ .Values.config.tax.authorityExternalId | quote }}
+            - name: TAX_REG_DUTY_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.tax.registrationDutyAccountExternalId | quote }}
+            - name: TAX_IRCM_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.tax.ircmAccountExternalId | quote }}
+            - name: TAX_CAP_GAINS_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.tax.capitalGainsAccountExternalId | quote }}
+            - name: TAX_TVA_ACCOUNT_EXTERNAL_ID
+              value: {{ .Values.config.tax.tvaAccountExternalId | quote }}
+            - name: TAX_DEFAULT_REGISTRATION_DUTY_RATE
+              value: {{ .Values.config.tax.defaultRegistrationDutyRate | quote }}
+            - name: TAX_DEFAULT_IRCM_DIVIDEND_RATE
+              value: {{ .Values.config.tax.defaultIrcmDividendRate | quote }}
+            - name: TAX_DEFAULT_IRCM_BVMAC_RATE
+              value: {{ .Values.config.tax.defaultIrcmBvmacRate | quote }}
+            - name: TAX_DEFAULT_IRCM_BOND_RATE
+              value: {{ .Values.config.tax.defaultIrcmBondRate | quote }}
+            - name: TAX_DEFAULT_CAPITAL_GAINS_RATE
+              value: {{ .Values.config.tax.defaultCapitalGainsRate | quote }}
+            - name: TAX_DEFAULT_TVA_RATE
+              value: {{ .Values.config.tax.defaultTvaRate | quote }}
+            - name: TAX_CAPITAL_GAINS_ANNUAL_EXEMPTION
+              value: {{ .Values.config.tax.capitalGainsAnnualExemption | quote }}
+            - name: ASSET_ISSUANCE_PAYMENT_TYPE
+              value: {{ .Values.config.assetIssuancePaymentType | quote }}
+            # Market hours
+            - name: ASSET_SERVICE_MARKET_HOURS_OPEN
+              value: {{ .Values.config.marketHours.open | quote }}
+            - name: ASSET_SERVICE_MARKET_HOURS_CLOSE
+              value: {{ .Values.config.marketHours.close | quote }}
+            - name: ASSET_SERVICE_MARKET_HOURS_WEEKEND_TRADING_ENABLED
+              value: {{ .Values.config.marketHours.weekendTradingEnabled | quote }}
+            # Security
+            - name: APP_SECURITY_PERMIT_ALL_ADMIN
+              value: {{ .Values.config.security.permitAllAdmin | quote }}
+            - name: APP_CORS_ALLOWED_ORIGINS
+              value: {{ .Values.config.security.corsAllowedOrigins | quote }}
+            # Storage (MinIO / S3)
+            - name: STORAGE_BUCKET
+              value: {{ .Values.config.storage.bucket | quote }}
+            - name: STORAGE_REGION
+              value: {{ .Values.config.storage.region | quote }}
+            - name: STORAGE_ENDPOINT
+              value: {{ .Values.config.storage.endpoint | quote }}
+            - name: STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "asset-service.secretName" . }}
+                  key: storage-access-key
+            - name: STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "asset-service.secretName" . }}
+                  key: storage-secret-key
+            - name: STORAGE_PUBLIC_BASE_URL
+              value: {{ .Values.config.storage.publicBaseUrl | quote }}
+            # Spring Boot
+            - name: SERVER_PORT
+              value: {{ .Values.service.targetPort | quote }}
+            - name: SPRING_MAIN_LAZY_INITIALIZATION
+              value: "true"
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            # JVM Options
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.javaOpts | default "-Xmx320m -Xms160m" }} -XX:+UseContainerSupport{{- if not .Values.fullJit }} -XX:+TieredCompilation -XX:TieredStopAtLevel=1{{- end }}"
+            # Actuator / Prometheus metrics
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,prometheus,threaddump"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            - name: MANAGEMENT_ENDPOINT_HEAPDUMP_ENABLED
+              value: "false"
+            # Tracing
+            {{- if .Values.tracing.enabled }}
+            - name: MANAGEMENT_TRACING_ENABLED
+              value: "true"
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: {{ .Values.tracing.samplingProbability | default "1.0" | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: "asset-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.otelEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+              value: "{{ .Values.tracing.otelEndpoint }}:4318/v1/traces"
+            {{- end }}
+            # Bond pricing
+            - name: BOND_PRICING_MARK_TO_MARKET_ENABLED
+              value: "{{ .Values.config.bondPricing.markToMarketEnabled | default true }}"
+            - name: BOND_PRICING_ACCRUED_INTEREST_ENABLED
+              value: "{{ .Values.config.bondPricing.accruedInterestEnabled | default true }}"
+            - name: BOND_PRICING_CLEAN_PRICE_SOURCE
+              value: {{ .Values.config.bondPricing.cleanPriceSource | default "lp_bid" | quote }}
+            # Rate limiting
+            - name: RATE_LIMIT_ENABLED
+              value: {{ .Values.config.rateLimitEnabled | default "true" | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpVolumeSizeLimit | default "256Mi" }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

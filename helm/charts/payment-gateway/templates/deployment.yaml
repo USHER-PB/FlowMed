@@ -1,0 +1,326 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "payment-gateway.fullname" . }}
+  labels:
+    {{- include "payment-gateway.labels" . | nindent 4 }}
+  {{- with (include "payment-gateway.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "payment-gateway.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "payment-gateway.podAnnotations" . | nindent 8 }}
+      labels:
+        {{- include "payment-gateway.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "payment-gateway.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers.waitForDependencies.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              ATTEMPT=0; MAX={{ .Values.initContainers.waitForDependencies.maxAttempts }}
+              until nc -z {{ .Values.config.database.host }} {{ .Values.config.database.port }} 2>/dev/null; do
+                ATTEMPT=$((ATTEMPT+1))
+                if [ $ATTEMPT -ge $MAX ]; then echo "ERROR: postgres not ready after $((MAX*5))s"; exit 1; fi
+                echo "waiting for postgres ($ATTEMPT/$MAX)..."; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+        - name: wait-for-fineract
+          image: {{ .Values.initContainers.waitForDependencies.image }}
+          securityContext:
+            {{- toYaml .Values.initContainers.waitForDependencies.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.config.fineract.host }} {{ .Values.config.fineract.port }} 2>/dev/null; do
+                echo "waiting for fineract"; sleep 5
+              done
+          resources:
+            {{- toYaml .Values.initContainers.waitForDependencies.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: {{ include "payment-gateway.name" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "payment-gateway.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            {{- if .Values.management.port }}
+            - name: management
+              containerPort: {{ .Values.management.port }}
+              protocol: TCP
+            {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            # Keycloak OAuth2
+            - name: KEYCLOAK_ISSUER_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}"
+            - name: KEYCLOAK_JWK_SET_URI
+              value: "{{ .Values.config.keycloak.url }}/realms/{{ .Values.config.keycloak.realm }}/protocol/openid-connect/certs"
+            - name: KEYCLOAK_CLIENT_ID
+              value: {{ .Values.config.keycloak.clientId | quote }}
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: keycloak-client-secret
+            # Fineract API
+            - name: FINERACT_URL
+              value: "{{ .Values.config.fineract.url }}/fineract-provider"
+            - name: FINERACT_TENANT
+              value: {{ .Values.config.fineract.tenant | default "default" | quote }}
+            - name: FINERACT_AUTH_TYPE
+              value: "basic"
+            - name: FINERACT_SAVINGS_PRODUCT_ID
+              value: {{ .Values.config.fineract.savingsProductId | quote }}
+            - name: FINERACT_USERNAME
+              value: {{ .Values.config.fineract.username | quote }}
+            - name: FINERACT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: fineract-password
+            # Database
+            - name: SPRING_DATASOURCE_URL
+              value: {{ .Values.config.database.url | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.config.database.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: db-password
+            # Redis
+            {{- if .Values.config.redis.enabled }}
+            - name: REDIS_HOST
+              value: {{ .Values.config.redis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.config.redis.port | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.redis.existingSecret | default (include "payment-gateway.secretName" .) }}
+                  key: redis-password
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.redis.existingSecret | default (include "payment-gateway.secretName" .) }}
+                  key: redis-password
+            {{- end }}
+            # Spring Boot
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.config.springProfile | default "default" | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.service.targetPort | quote }}
+            # MTN MoMo
+            {{- if .Values.providers.mtn.enabled }}
+            - name: MTN_BASE_URL
+              value: {{ .Values.providers.mtn.baseUrl | quote }}
+            - name: MTN_TARGET_ENV
+              value: {{ .Values.providers.mtn.targetEnv | quote }}
+            - name: MTN_COLLECTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: mtn-collection-key
+            - name: MTN_DISBURSEMENT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: mtn-disbursement-key
+            - name: MTN_API_USER_ID
+              value: {{ .Values.providers.mtn.apiUserId | quote }}
+            - name: MTN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: mtn-api-key
+            - name: MTN_CALLBACK_URL
+              value: {{ .Values.providers.mtn.callbackUrl | quote }}
+            - name: MTN_GL_ACCOUNT_CODE
+              value: {{ .Values.providers.mtn.glAccountCode | quote }}
+            {{- end }}
+            # Orange Money
+            {{- if .Values.providers.orange.enabled }}
+            - name: ORANGE_BASE_URL
+              value: {{ .Values.providers.orange.baseUrl | quote }}
+            - name: ORANGE_CLIENT_ID
+              value: {{ .Values.providers.orange.clientId | quote }}
+            - name: ORANGE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: orange-client-secret
+            - name: ORANGE_MERCHANT_CODE
+              value: {{ .Values.providers.orange.merchantCode | quote }}
+            - name: ORANGE_GL_ACCOUNT_CODE
+              value: {{ .Values.providers.orange.glAccountCode | quote }}
+            {{- end }}
+            # CinetPay
+            {{- if .Values.providers.cinetpay.enabled }}
+            - name: CINETPAY_BASE_URL
+              value: {{ .Values.providers.cinetpay.baseUrl | quote }}
+            - name: CINETPAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: cinetpay-api-key
+            - name: CINETPAY_SITE_ID
+              value: {{ .Values.providers.cinetpay.siteId | quote }}
+            - name: CINETPAY_API_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: cinetpay-api-password
+            {{- end }}
+            # Nokash
+            {{- if .Values.providers.nokash.enabled }}
+            - name: NOKASH_ENABLED
+              value: "true"
+            - name: NOKASH_BASE_URL
+              value: {{ .Values.providers.nokash.baseUrl | quote }}
+            - name: NOKASH_I_SPACE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: nokash-i-space-key
+            - name: NOKASH_APP_SPACE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "payment-gateway.secretName" . }}
+                  key: nokash-app-space-key
+            - name: NOKASH_FINERACT_PAYMENT_TYPE_ID
+              value: {{ .Values.providers.nokash.fineractPaymentTypeId | quote }}
+            - name: NOKASH_CALLBACK_URL
+              value: {{ .Values.providers.nokash.callbackUrl | quote }}
+            - name: NOKASH_GL_ACCOUNT_CODE
+              value: {{ .Values.providers.nokash.glAccountCode | quote }}
+            - name: NOKASH_SENDER_FIRST_NAME
+              value: {{ .Values.providers.nokash.senderFirstName | default "Platform" | quote }}
+            - name: NOKASH_SENDER_LAST_NAME
+              value: {{ .Values.providers.nokash.senderLastName | default "Services" | quote }}
+            {{- end }}
+            # Scheduler - stale transaction resolution
+            - name: APP_CLEANUP_ENABLED
+              value: {{ .Values.scheduler.enabled | quote }}
+            - name: APP_CLEANUP_STALE_MINUTES
+              value: {{ .Values.scheduler.staleMinutes | quote }}
+            - name: APP_CLEANUP_INTERVAL_MS
+              value: {{ .Values.scheduler.intervalMs | quote }}
+            # Spring Boot startup optimization
+            - name: SPRING_MAIN_LAZY_INITIALIZATION
+              value: "true"
+            # JVM Options
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.javaOpts | default "-Xmx256m -Xms128m" }} -XX:+UseContainerSupport -XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+            # Actuator / Prometheus metrics
+            - name: MANAGEMENT_SERVER_PORT
+              value: {{ .Values.management.port | default .Values.service.targetPort | quote }}
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus,threaddump"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            # Structured logging
+            - name: LOGGING_PATTERN_CONSOLE
+              value: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+            # Tracing
+            {{- if .Values.tracing.enabled }}
+            - name: MANAGEMENT_TRACING_ENABLED
+              value: "true"
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: {{ .Values.tracing.samplingProbability | default "1.0" | quote }}
+            - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+              value: "{{ .Values.tracing.otelEndpoint }}:4318/v1/traces"
+            - name: OTEL_SERVICE_NAME
+              value: "payment-gateway"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.otelEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.httpGet.path }}
+              port: {{ .Values.management.port | default .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpVolumeSizeLimit | default "256Mi" }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

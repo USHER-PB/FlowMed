@@ -1,0 +1,216 @@
+# Default values for customer-self-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Number of replicas (overridden by HPA if enabled)
+replicaCount: 1
+
+# Image configuration
+image:
+  registry: ghcr.io
+  repository: adorsys-gis/fineract-apps/customer-self-service
+  tag: "latest"
+  pullPolicy: Always
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+# - name: regcred
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: ""
+  automount: false
+  annotations: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%
+
+# Resource limits and requests
+resources:
+  requests:
+    memory: "160Mi"
+    cpu: "50m"
+  limits:
+    memory: "320Mi"
+    cpu: "250m"
+
+# Java JVM options
+javaOpts: "-Xmx160m -Xms80m"
+
+# Tmp volume size limit
+tmpVolumeSizeLimit: "256Mi"
+
+# Liveness probe configuration
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health/liveness
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health/readiness
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Startup probe configuration
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  failureThreshold: 60
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: ~
+  behavior: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ~
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  ingressNamespace: "ingress-nginx"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Annotations for deployment
+annotations: {}
+
+# Init containers configuration
+initContainers:
+  waitForDependencies:
+    enabled: true
+    image: busybox:1.36.1
+    maxAttempts: 24
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      capabilities:
+        drop:
+          - ALL
+    resources:
+      requests:
+        memory: "16Mi"
+        cpu: "10m"
+      limits:
+        memory: "32Mi"
+        cpu: "50m"
+
+# Configuration settings
+config:
+  # Keycloak OAuth2 configuration
+  keycloak:
+    url: "http://keycloak:8080"
+    realm: "master"
+    clientId: "customer-registration"
+    clientSecret: ""  # Set via sealed-secret
+    port: 8080
+
+  # Fineract API configuration
+  fineract:
+    url: "https://fineract-core-write:8080"
+    host: "fineract-core-write"
+    port: 8080
+    tenant: "default"
+    username: "mifos"
+    password: ""  # Set via sealed-secret
+
+  # Database configuration
+  database:
+    host: "postgres"
+    port: 5432
+    url: "jdbc:postgresql://postgres:5432/customer_self_service"
+    username: "customer_self_service"
+    password: ""  # Set via sealed-secret
+
+  # Redis configuration
+  redis:
+    enabled: false
+    host: "redis"
+    port: 6379
+    password: ""  # Set via sealed-secret
+    existingSecret: ""
+
+  # Self-Service configuration
+  selfService:
+    defaultOfficeId: ""
+    defaultGroupPath: ""
+    defaultKycTier: "1"
+    defaultKycStatus: "pending"
+
+# Tracing configuration
+tracing:
+  enabled: false
+  samplingProbability: "1.0"
+  otelEndpoint: "http://otel-collector:4317"
+
+# Extra environment variables
+extraEnv: []
+
+# Existing secret for credentials (if using sealed-secrets)
+existingSecret: ""

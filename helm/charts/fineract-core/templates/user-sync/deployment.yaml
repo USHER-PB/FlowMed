@@ -63,11 +63,17 @@ spec:
                   key: {{ .Values.secrets.userSync.clientSecretKey | default "keycloak-client-secret" }}
             # Fineract API connection
             - name: FINERACT_API_URL
-              value: "http://{{ include "fineract-core.fullname" . }}-write:8080"
+              value: "https://{{ include "fineract-core.fullname" . }}-write:8080"
             - name: FINERACT_API_USERNAME
-              value: {{ .Values.fineract.api.username | default "mifos" | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: {{ .Values.secrets.fineractApi.usernameKey | default "username" }}
             - name: FINERACT_API_PASSWORD
-              value: {{ .Values.fineract.api.password | default "password" | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: {{ .Values.secrets.fineractApi.passwordKey | default "password" }}
             # Sync configuration
             - name: SYNC_INTERVAL_SECONDS
               value: {{ .Values.userSync.syncIntervalSeconds | quote }}

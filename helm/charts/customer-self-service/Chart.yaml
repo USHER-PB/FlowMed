@@ -1,0 +1,29 @@
+apiVersion: v2
+name: customer-self-service
+description: |
+  Customer Self-Service for Fineract platform.
+  Handles customer registration, KYC verification, and self-service operations.
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+keywords:
+  - customer
+  - self-service
+  - kyc
+  - registration
+  - fineract
+  - onboarding
+
+home: https://github.com/skyengpro/om
+sources:
+  - https://github.com/skyengpro/om
+
+annotations:
+  category: Application
+  wave: "5"
