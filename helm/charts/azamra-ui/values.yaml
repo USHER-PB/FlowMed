@@ -1,0 +1,52 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets:
+    - name: ghcr-credentials
+
+networkPolicies:
+  enabled: true
+
+# Container image
+image:
+  repository: ghcr.io/skyengpro/azamra-tokenization-frontend-mobile
+  tag: "latest-amd"
+  pullPolicy: Always
+
+port: 8080
+replicas: 1
+
+# Ingress — mobile-friendly hostname as per Issue #80
+ingress:
+  enabled: true
+  className: nginx
+  host: "mobile.fineract.local"     # Override per env: app.yourdomain.com
+  tls:
+    enabled: false
+    clusterIssuer: letsencrypt-prod  # Reuse cert-manager from Wave 7
+
+# Runtime config injected as config.json into the nginx container.
+# The PWA reads this at startup — no image rebuild needed to change endpoints.
+config:
+  # API base URL pointing to Azamra BFF (Wave 6)
+  backendUrl: "http://azamra-bff:8080"
+  # Proof-of-Work difficulty (client-side challenge for registration)
+  powDifficulty: "5"
+  # OpenTelemetry endpoint (optional)
+  otlpEndpoint: "http://otel-collector:4318"
+  # Keycloak PKCE flow settings (Wave 1)
+  keycloak:
+    realm: "fineract"
+    kcUrl: "http://auth.fineract.local"                        # Public Keycloak URL
+    issuer: "http://auth.fineract.local/realms/fineract"       # Must match token 'iss' claim
+    clientId: "web-mobile"                                     # Existing public PKCE client - NO secret
+    scheme: "http"                                             # Set "https" for prod
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "10m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
