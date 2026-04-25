@@ -3,7 +3,7 @@ fullnameOverride: ""
 
 global:
   imagePullSecrets:
-    - name: ghcr-secret
+    - name: ghcr-credentials
 
 networkPolicies:
   enabled: true
@@ -40,7 +40,7 @@ config:
     realm: "fineract"
     kcUrl: "http://auth.fineract.local"                        # Public Keycloak URL
     issuer: "http://auth.fineract.local/realms/fineract"       # Must match token 'iss' claim
-    clientId: "azamra-client"                                  # Public PKCE client - NO secret
+    clientId: "web-mobile"                                     # Existing public PKCE client - NO secret
     scheme: "http"                                             # Set "https" for prod
 
 resources:
