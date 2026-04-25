@@ -83,10 +83,16 @@ azamraKycManager:
   nextAuthUrl: "http://kyc.fineract.local"
   oauth2:
     issuer: ""  # Leave empty to use global keycloakPublicUrl + realm
+    internalIssuer: ""  # Optional: only set when the internal discovery document advertises the same issuer as the public one
     clientId: "kyc-manager"
     clientSecret: ""  # REQUIRED: Set OAuth2 client secret for dev, or use existingSecret for K8s
     scopes: "openid profile email"
     providerId: "keycloak"
+  publicIssuerAccess:
+    enabled: false
+    host: "auth.fineract.local"
+    ip: ""  # Set to the ingress IP for branch-local issuer resolution
+    port: 80  # Use 443 when Keycloak ingress TLS is enabled
   apiUrl: "http://user-storage:3000"
   ingress:
     enabled: true

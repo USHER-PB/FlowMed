@@ -18,6 +18,12 @@ spec:
         app: azamra-kyc-manager
     spec:
       {{- include "azamra-edge.imagePullSecrets" . | nindent 6 }}
+      {{- if and .Values.azamraKycManager.publicIssuerAccess.enabled .Values.azamraKycManager.publicIssuerAccess.ip }}
+      hostAliases:
+        - ip: {{ .Values.azamraKycManager.publicIssuerAccess.ip | quote }}
+          hostnames:
+            - {{ .Values.azamraKycManager.publicIssuerAccess.host | quote }}
+      {{- end }}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -47,8 +53,10 @@ spec:
               value: "0.0.0.0"
             - name: OAUTH2_ISSUER
               value: {{ .Values.azamraKycManager.oauth2.issuer | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
+            {{- if .Values.azamraKycManager.oauth2.internalIssuer }}
             - name: OAUTH2_INTERNAL_ISSUER
-              value: {{ .Values.azamraKycManager.oauth2.issuer | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
+              value: {{ .Values.azamraKycManager.oauth2.internalIssuer | quote }}
+            {{- end }}
             - name: OAUTH2_PUBLIC_ISSUER
               value: {{ .Values.azamraKycManager.oauth2.issuer | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
             - name: OAUTH2_CLIENT_ID

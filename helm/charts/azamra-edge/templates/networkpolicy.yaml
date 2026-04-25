@@ -218,6 +218,36 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+    {{- if .Values.azamraKycManager.oauth2.internalIssuer }}
+    # Keycloak access (only needed when using an internal issuer override)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: keycloak
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    {{- end }}
+    {{- if and .Values.azamraKycManager.publicIssuerAccess.enabled .Values.azamraKycManager.publicIssuerAccess.ip }}
+    # Public Keycloak issuer access via ingress IP (scoped to KYC manager only)
+    - to:
+        - ipBlock:
+            cidr: {{ printf "%s/32" .Values.azamraKycManager.publicIssuerAccess.ip }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.azamraKycManager.publicIssuerAccess.port }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.azamraKycManager.publicIssuerAccess.port }}
+    {{- end }}
     # External HTTPS (Keycloak OIDC discovery, public issuer)
     - to:
         - namespaceSelector: {}
