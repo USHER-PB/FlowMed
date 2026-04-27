@@ -8,11 +8,14 @@ import { resetRedisClient } from "../redis";
 import { checkRateLimit } from "../security/rate-limiter";
 
 beforeEach(() => {
+  // Ensure we use in-memory Redis for tests
+  delete process.env.REDIS_URL;
   resetRedisClient();
   jest.useRealTimers();
 });
 
 afterEach(() => {
+  resetRedisClient();
   jest.useRealTimers();
 });
 

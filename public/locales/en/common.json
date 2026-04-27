@@ -59,5 +59,26 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous"
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "We're here to help you",
+    "description": "Have questions or need assistance? Don't hesitate to reach out. Our team is available 24/7 to support you.",
+    "form": {
+      "name": "Full Name",
+      "email": "Email Address",
+      "phone": "Phone Number",
+      "message": "Message",
+      "submit": "Send Message",
+      "submitting": "Sending...",
+      "success": "Message sent successfully!",
+      "error": "An error occurred. Please try again."
+    },
+    "info": {
+      "address": "Douala, Cameroon",
+      "phone": "+237 690 290 961 / +237 677 317 976",
+      "email": "ushertchankoumi9@gmail.com",
+      "hours": "24/7 Available"
+    }
   }
 }

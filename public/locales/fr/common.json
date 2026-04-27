@@ -59,5 +59,26 @@
     "back": "Retour",
     "next": "Suivant",
     "previous": "Précédent"
+  },
+  "contact": {
+    "title": "Contactez-nous",
+    "subtitle": "Nous sommes là pour vous aider",
+    "description": "Vous avez des questions ou besoin d'assistance ? N'hésitez pas à nous contacter. Notre équipe est disponible 24/7 pour vous accompagner.",
+    "form": {
+      "name": "Nom complet",
+      "email": "Adresse e-mail",
+      "phone": "Numéro de téléphone",
+      "message": "Message",
+      "submit": "Envoyer",
+      "submitting": "Envoi en cours...",
+      "success": "Message envoyé avec succès !",
+      "error": "Une erreur s'est produite. Veuillez réessayer."
+    },
+    "info": {
+      "address": "Douala, Cameroun",
+      "phone": "+237 690 290 961 / +237 677 317 976",
+      "email": "ushertchankoumi9@gmail.com",
+      "hours": "24h/24, 7j/7"
+    }
   }
 }

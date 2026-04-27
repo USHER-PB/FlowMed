@@ -11,6 +11,9 @@ import type { Prisma } from ".prisma/client";
 // ProviderTier defined locally until prisma generate is run
 type ProviderTier = 'TIER_1_DOCTOR' | 'TIER_2_NURSE' | 'TIER_3_CERTIFIED_WORKER' | 'TIER_4_STUDENT' | 'TIER_5_VOLUNTEER';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/providers/search
  *

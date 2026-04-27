@@ -1,6 +1,12 @@
 import { getRedisClient, resetRedisClient } from '../redis';
 
 beforeEach(() => {
+  // Ensure we use in-memory Redis for tests
+  delete process.env.REDIS_URL;
+  resetRedisClient();
+});
+
+afterEach(() => {
   resetRedisClient();
 });
 

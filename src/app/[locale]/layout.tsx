@@ -1,19 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { locales } from '@/i18n';
 import "../globals.css";
 
+const locales = ['en', 'fr'];
+
 export const metadata: Metadata = {
-  title: "HealthMarket Cameroon",
-  description: "Connecting patients with healthcare providers across Cameroon",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "HealthMarket",
-  },
+  title: "FlowMed Cameroon - Healthcare Marketplace Platform",
+  description: "Connecting patients with healthcare providers across Cameroon. Book appointments, manage medical records, and access quality healthcare services.",
+  keywords: ["healthcare", "Cameroon", "medical", "appointments", "telemedicine"],
+  authors: [{ name: "FlowMed Cameroon" }],
 };
 
 export const viewport: Viewport = {
@@ -23,44 +18,25 @@ export const viewport: Viewport = {
   minimumScale: 1,
 };
 
-export default async function LocaleLayout({
+export default function LocaleLayout({
   children,
-  params: { locale },
+  params,
 }: {
   children: React.ReactNode;
   params: { locale: string };
 }) {
-  if (!locales.includes(locale as any)) {
+  const { locale } = params;
+  
+  if (!locales.includes(locale)) {
     notFound();
   }
 
-  const messages = await getMessages();
-
   return (
     <html lang={locale}>
-      <head>
-        {/* PWA / Apple meta tags */}
-        <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-      </head>
       <body>
-        <NextIntlClientProvider messages={messages}>
+        <div className="min-h-screen bg-gray-50">
           {children}
-        </NextIntlClientProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                    .catch(function(err) {
-                      console.error('[SW] Registration failed:', err);
-                    });
-                });
-              }
-            `,
-          }}
-        />
+        </div>
       </body>
     </html>
   );

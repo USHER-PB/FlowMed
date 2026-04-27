@@ -60,7 +60,7 @@ export default function ProviderDashboardPage() {
       setProvider(prov);
 
       const [queueRes, apptRes] = await Promise.all([
-        fetch(`/api/queue/${prov.id}`),
+        fetch(`/api/queue/provider/${prov.id}`),
         fetch("/api/appointments?status=CONFIRMED&pageSize=100"),
       ]);
 
@@ -95,7 +95,7 @@ export default function ProviderDashboardPage() {
     if (!provider) return;
     setUpdating(queueItemId);
     try {
-      const res = await fetch(`/api/queue/${provider.id}`, {
+      const res = await fetch(`/api/queue/provider/${provider.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ queueItemId, status }),

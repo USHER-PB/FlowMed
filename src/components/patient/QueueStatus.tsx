@@ -46,7 +46,7 @@ export default function QueueStatus({ appointmentId }: QueueStatusProps) {
   useEffect(() => {
     async function fetchPosition() {
       try {
-        const res = await fetch(`/api/queue/${appointmentId}/position`);
+        const res = await fetch(`/api/queue/appointment/${appointmentId}/position`);
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error ?? "Failed to load queue position");
