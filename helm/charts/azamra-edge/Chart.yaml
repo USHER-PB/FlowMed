@@ -1,0 +1,9 @@
+apiVersion: v2
+name: azamra-edge
+description: Azamra edge services layer (BFF, KYC-Manager, User-Storage SPI)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: OM Platform Team
+    email: platform@om.local

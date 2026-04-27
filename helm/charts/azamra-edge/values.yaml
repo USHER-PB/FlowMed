@@ -1,0 +1,174 @@
+# Azamra Edge Services Helm Chart Values
+# ======================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Secrets configuration
+secrets:
+  mode: existing  # "generate" for local dev, "existing" for K8s with sealed secrets
+
+# Network policies
+networkPolicies:
+  enabled: true
+
+# Global settings
+global:
+  imagePullSecrets:
+    - name: ghcr-credentials
+  keycloakUrl: "http://keycloak:8080"
+  keycloakPublicUrl: "http://auth.fineract.local"
+  realm: fineract
+  otelEndpoint: "http://otel-collector:4317"
+
+# ---------------------------------------------------------------------------
+# Azamra BFF (Spring Boot - Backend for Frontend)
+# ---------------------------------------------------------------------------
+azamraBff:
+  enabled: true
+  image:
+    repository: ghcr.io/skyengpro/azamra-tokenization-bff
+    tag: "develop-amd"  # AMD64 for Hetzner K3s
+  port: 8080
+  replicas: 1
+  keycloak:
+    issuerUri: ""  # Leave empty to use global keycloakPublicUrl + realm
+    jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
+  services:
+    assetServiceUrl: "http://fineract-app-services-asset-service:8083/api/v1"
+    cussUrl: "http://fineract-app-services-customer-self-service:8080"
+    userStorageUrl: "http://user-storage:3000/bff"
+    paymentGatewayUrl: "http://fineract-app-services-payment-gateway:8082"
+  ingress:
+    enabled: true
+    className: nginx
+    host: "bff.fineract.local"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    tls:
+      enabled: false
+      secretName: ""
+  security:
+    signatureEnabled: "true"
+    validateIssuer: "true"
+  tracing:
+    enabled: "true"
+    samplingProbability: "0.1"
+  kyc:
+    whatsappLink: "https://wa.link/jprtzd"
+  redis:
+    host: infra-cache-redis
+    port: "6379"
+    password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ---------------------------------------------------------------------------
+# Azamra KYC Manager (Next.js standalone)
+# ---------------------------------------------------------------------------
+azamraKycManager:
+  enabled: true
+  image:
+    repository: ghcr.io/skyengpro/azamra-tokenization-frontend-kyc-mgr
+    tag: "latest-amd"  # AMD64 for Hetzner K3s
+  port: 3000
+  replicas: 1
+  existingSecret: "kyc-manager-credentials"  # SealedSecret for KYC Manager
+  nextAuthUrl: "http://kyc.fineract.local"
+  oauth2:
+    issuer: ""  # Leave empty to use global keycloakPublicUrl + realm
+    internalIssuer: ""  # Optional: only set when the internal discovery document advertises the same issuer as the public one
+    clientId: "kyc-manager"
+    clientSecret: ""  # REQUIRED: Set OAuth2 client secret for dev, or use existingSecret for K8s
+    scopes: "openid profile email"
+    providerId: "keycloak"
+  publicIssuerAccess:
+    enabled: false
+    host: "auth.fineract.local"
+    ip: ""  # Set to the ingress IP for branch-local issuer resolution
+    port: 80  # Use 443 when Keycloak ingress TLS is enabled
+  apiUrl: "http://user-storage:3000"
+  ingress:
+    enabled: true
+    className: nginx
+    host: "kyc.fineract.local"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    tls:
+      enabled: false
+      secretName: ""
+  redis:
+    host: infra-cache-redis
+    port: "6379"
+    password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# ---------------------------------------------------------------------------
+# User Storage (Rust - Keybound Backend)
+# ---------------------------------------------------------------------------
+userStorage:
+  enabled: true
+  initDatabase:
+    enabled: true  # Enable init-db-job to create database
+  image:
+    repository: ghcr.io/adorsys-gis/user-storage
+    tag: "master"  # Uses multi-arch image
+  port: 3000
+  replicas: 1
+  existingSecret: "user-storage-credentials"  # SealedSecret for user-storage
+  database:
+    url: ""  # Not used when existingSecret is set
+    poolSize: 15
+  redis:
+    url: ""  # Not used when existingSecret is set
+    existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
+  minio:
+    endpoint: "http://data-store-minio:9000"
+    region: "us-east-1"
+    accessKey: ""  # Not used when existingSecret is set
+    secretKey: ""  # Not used when existingSecret is set
+    bucket: "user-storage"
+    existingSecret: "data-store-minio"  # MinIO credentials secret
+  oauth2:
+    issuer: ""  # Leave empty to use global keycloakUrl + realm
+    jwkSetUri: ""  # Leave empty to use global keycloakUrl + realm
+  kc:
+    enabled: true
+    basePath: "/kc"
+    signatureSecret: ""  # Set via existingSecret (KC_SIGNATURE_SECRET)
+    maxClockSkewSeconds: 60
+    maxBodyBytes: 262144
+  bff:
+    enabled: true
+    basePath: "/bff"
+  staff:
+    enabled: true
+    basePath: "/staff"
+  cuss:
+    apiUrl: "http://fineract-app-services-customer-self-service:8080"
+    clientSecret: ""  # Not used when existingSecret is set
+    existingSecret: ""  # Optional: separate secret for CUSS client
+  sms:
+    provider: "api"
+    apiBaseUrl: ""
+  otelEndpoint: ""  # Leave empty to use global otelEndpoint
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"

@@ -1,0 +1,145 @@
+{{- if .Values.azamraBff.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azamra-bff
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-bff
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.azamraBff.replicas }}
+  selector:
+    matchLabels:
+      app: azamra-bff
+  template:
+    metadata:
+      labels:
+        app: azamra-bff
+    spec:
+      {{- include "azamra-edge.imagePullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-user-storage
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z user-storage {{ .Values.userStorage.port }}; do echo waiting for user-storage; sleep 5; done']
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+      containers:
+        - name: azamra-bff
+          image: "{{ .Values.azamraBff.image.repository }}:{{ .Values.azamraBff.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: {{ .Values.azamraBff.port }}
+              name: http
+          env:
+            # Spring profile
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            # Override base-path so routes mount at / instead of /api/v1/api
+            - name: APP_AZAMRA_FRONTEND_SERVER_API_BASE_PATH
+              value: ""
+            # OAuth2 / JWT
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              value: {{ .Values.azamraBff.keycloak.issuerUri | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+              value: {{ .Values.azamraBff.keycloak.jwkSetUri | default (printf "%s/realms/%s/protocol/openid-connect/certs" .Values.global.keycloakUrl .Values.global.realm) | quote }}
+            - name: APP_OAUTH2_TOKEN_ENDPOINT_URL
+              value: "{{ .Values.global.keycloakUrl }}/realms/{{ .Values.global.realm }}/protocol/openid-connect/token"
+            # Service dependencies
+            - name: APP_ASSET_SERVICE_BASE_URL
+              value: {{ .Values.azamraBff.services.assetServiceUrl | quote }}
+            - name: APP_CUSS_BASE_URL
+              value: {{ .Values.azamraBff.services.cussUrl | quote }}
+            - name: APP_USER_STORAGE_BASE_URL
+              value: {{ .Values.azamraBff.services.userStorageUrl | quote }}
+            - name: APP_PAYMENT_GATEWAY_BASE_URL
+              value: {{ .Values.azamraBff.services.paymentGatewayUrl | quote }}
+            # Security
+            - name: APP_SECURITY_SIGNATURE_ENABLED
+              value: {{ .Values.azamraBff.security.signatureEnabled | quote }}
+            - name: APP_SECURITY_VALIDATE_ISSUER
+              value: {{ .Values.azamraBff.security.validateIssuer | quote }}
+            - name: APP_KYC_WHATSAPP_LINK
+              value: {{ .Values.azamraBff.kyc.whatsappLink | quote }}
+            # Redis cache
+            - name: SPRING_CACHE_TYPE
+              value: "redis"
+            - name: SPRING_DATA_REDIS_HOST
+              value: {{ .Values.azamraBff.redis.host | quote }}
+            - name: SPRING_DATA_REDIS_PORT
+              value: {{ .Values.azamraBff.redis.port | quote }}
+            {{- if .Values.azamraBff.redis.existingSecret }}
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.azamraBff.redis.existingSecret }}
+                  key: redis-password
+            {{- else }}
+            - name: SPRING_DATA_REDIS_PASSWORD
+              value: {{ .Values.azamraBff.redis.password | quote }}
+            {{- end }}
+            # Server
+            - name: SERVER_PORT
+              value: {{ .Values.azamraBff.port | quote }}
+            # Logging
+            - name: LOGGING_LEVEL_ROOT
+              value: "INFO"
+            - name: LOGGING_LEVEL_COM_AZAMRA_BACKEND_AZAMRA_TOKENIZATION_BFF
+              value: "DEBUG"
+            # JVM (use JAVA_TOOL_OPTIONS for Spring Boot buildpack images)
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+            # Actuator / Prometheus
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus,threaddump"
+            - name: MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED
+              value: "true"
+            # Tracing
+            - name: OTEL_SERVICE_NAME
+              value: "azamra-bff"
+            - name: MANAGEMENT_TRACING_ENABLED
+              value: {{ .Values.azamraBff.tracing.enabled | default "true" | quote }}
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: {{ .Values.azamraBff.tracing.samplingProbability | default "0.1" | quote }}
+            - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+              value: '{{ .Values.global.otelEndpoint }}:4318/v1/traces'
+          resources:
+            {{- toYaml .Values.azamraBff.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.azamraBff.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.azamraBff.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.azamraBff.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+{{- end }}

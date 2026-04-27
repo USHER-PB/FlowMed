@@ -1,0 +1,201 @@
+{{- if .Values.userStorage.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: user-storage
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.userStorage.replicas }}
+  selector:
+    matchLabels:
+      app: user-storage
+  template:
+    metadata:
+      labels:
+        app: user-storage
+    spec:
+      {{- include "azamra-edge.imagePullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z data-store-postgres-rw 5432; do echo waiting for postgres; sleep 2; done']
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z infra-cache-redis 6379; do echo waiting for redis; sleep 2; done']
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+        - name: clear-redis-locks
+          image: redis:7-alpine
+          command:
+            - sh
+            - -c
+            - |
+              redis-cli -h infra-cache-redis -p 6379 DEL backend:worker:consumer-lock
+              echo "Redis worker lock cleared"
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          {{- if .Values.userStorage.redis.existingSecret }}
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.redis.existingSecret }}
+                  key: redis-password
+          {{- end }}
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+      containers:
+        - name: user-storage
+          image: "{{ .Values.userStorage.image.repository }}:{{ .Values.userStorage.image.tag }}"
+          securityContext:
+            runAsUser: 65532
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          args: ["serve", "--config-path", "/app/config/config.yaml", "--mode", "shared"]
+          ports:
+            - containerPort: {{ .Values.userStorage.port }}
+              name: http
+          env:
+            {{- if .Values.userStorage.existingSecret }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.existingSecret }}
+                  key: USER_STORAGE_DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgres://user_storage:$(DB_PASSWORD)@data-store-postgres-rw:5432/user_storage"
+            {{- else }}
+            - name: DATABASE_URL
+              value: {{ .Values.userStorage.database.url | quote }}
+            {{- end }}
+            {{- if .Values.userStorage.redis.existingSecret }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.redis.existingSecret }}
+                  key: redis-password
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@infra-cache-redis:6379"
+            {{- else }}
+            - name: REDIS_URL
+              value: {{ .Values.userStorage.redis.url | quote }}
+            {{- end }}
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.userStorage.minio.endpoint | quote }}
+            - name: MINIO_REGION
+              value: {{ .Values.userStorage.minio.region | quote }}
+            {{- if .Values.userStorage.minio.existingSecret }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.minio.existingSecret }}
+                  key: root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.minio.existingSecret }}
+                  key: root-password
+            {{- else }}
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.userStorage.minio.accessKey | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.userStorage.minio.secretKey | quote }}
+            {{- end }}
+            - name: MINIO_BUCKET
+              value: {{ .Values.userStorage.minio.bucket | quote }}
+            - name: RUST_LOG
+              value: "debug"
+            {{- if .Values.userStorage.sms.apiBaseUrl }}
+            - name: SMS_SINK_URL
+              value: {{ .Values.userStorage.sms.apiBaseUrl | quote }}
+            {{- end }}
+            - name: CUSS_URL
+              value: {{ .Values.userStorage.cuss.apiUrl | quote }}
+            - name: KEYCLOAK_INTERNAL_URL
+              value: {{ .Values.global.keycloakUrl | quote }}
+            - name: KC_TOKEN_URL
+              value: {{ printf "%s/realms/%s/protocol/openid-connect/token" .Values.global.keycloakUrl .Values.global.realm | quote }}
+            - name: CUSS_CLIENT_ID
+              value: "customer-registration"
+            {{- if .Values.userStorage.cuss.existingSecret }}
+            - name: CUSS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.cuss.existingSecret }}
+                  key: keycloak-client-secret
+            {{- else }}
+            - name: CUSS_CLIENT_SECRET
+              value: {{ .Values.userStorage.cuss.clientSecret | default "customer-registration-secret" | quote }}
+            {{- end }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.userStorage.otelEndpoint | default .Values.global.otelEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: user-storage-backend
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          resources:
+            {{- toYaml .Values.userStorage.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.userStorage.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.userStorage.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.userStorage.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: user-storage-config
+{{- end }}

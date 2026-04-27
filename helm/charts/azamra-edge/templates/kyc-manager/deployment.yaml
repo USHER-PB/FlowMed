@@ -1,0 +1,116 @@
+{{- if .Values.azamraKycManager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azamra-kyc-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-kyc-manager
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.azamraKycManager.replicas }}
+  selector:
+    matchLabels:
+      app: azamra-kyc-manager
+  template:
+    metadata:
+      labels:
+        app: azamra-kyc-manager
+    spec:
+      {{- include "azamra-edge.imagePullSecrets" . | nindent 6 }}
+      {{- if and .Values.azamraKycManager.publicIssuerAccess.enabled .Values.azamraKycManager.publicIssuerAccess.ip }}
+      hostAliases:
+        - ip: {{ .Values.azamraKycManager.publicIssuerAccess.ip | quote }}
+          hostnames:
+            - {{ .Values.azamraKycManager.publicIssuerAccess.host | quote }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: azamra-kyc-manager
+          image: "{{ .Values.azamraKycManager.image.repository }}:{{ .Values.azamraKycManager.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: {{ .Values.azamraKycManager.port }}
+              name: http
+          env:
+            - name: TZ
+              value: "Europe/Berlin"
+            - name: DEBUG
+              value: "*"
+            - name: PORT
+              value: {{ .Values.azamraKycManager.port | quote }}
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: OAUTH2_ISSUER
+              value: {{ .Values.azamraKycManager.oauth2.issuer | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
+            {{- if .Values.azamraKycManager.oauth2.internalIssuer }}
+            - name: OAUTH2_INTERNAL_ISSUER
+              value: {{ .Values.azamraKycManager.oauth2.internalIssuer | quote }}
+            {{- end }}
+            - name: OAUTH2_PUBLIC_ISSUER
+              value: {{ .Values.azamraKycManager.oauth2.issuer | default (printf "%s/realms/%s" .Values.global.keycloakPublicUrl .Values.global.realm) | quote }}
+            - name: OAUTH2_CLIENT_ID
+              value: {{ .Values.azamraKycManager.oauth2.clientId | quote }}
+            {{- if .Values.azamraKycManager.existingSecret }}
+            - name: OAUTH2_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.azamraKycManager.existingSecret }}
+                  key: keycloak-client-secret
+            {{- else }}
+            - name: OAUTH2_CLIENT_SECRET
+              value: {{ .Values.azamraKycManager.oauth2.clientSecret | quote }}
+            {{- end }}
+            - name: OAUTH2_SCOPES
+              value: {{ .Values.azamraKycManager.oauth2.scopes | quote }}
+            - name: OAUTH2_PROVIDER_ID
+              value: {{ .Values.azamraKycManager.oauth2.providerId | quote }}
+            - name: API_URL
+              value: {{ .Values.azamraKycManager.apiUrl | quote }}
+            {{- if .Values.azamraKycManager.nextAuthUrl }}
+            - name: NEXTAUTH_URL
+              value: {{ .Values.azamraKycManager.nextAuthUrl | quote }}
+            {{- end }}
+            {{- if .Values.azamraKycManager.redis.existingSecret }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.azamraKycManager.redis.existingSecret }}
+                  key: redis-password
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.azamraKycManager.redis.host }}:{{ .Values.azamraKycManager.redis.port }}"
+            {{- else }}
+            - name: REDIS_URL
+              value: "redis://:{{ .Values.azamraKycManager.redis.password }}@{{ .Values.azamraKycManager.redis.host }}:{{ .Values.azamraKycManager.redis.port }}"
+            {{- end }}
+          resources:
+            {{- toYaml .Values.azamraKycManager.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.azamraKycManager.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.azamraKycManager.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.azamraKycManager.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+{{- end }}

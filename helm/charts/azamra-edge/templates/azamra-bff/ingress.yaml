@@ -1,0 +1,33 @@
+{{- if and .Values.azamraBff.enabled .Values.azamraBff.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: azamra-bff
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-bff
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+  {{- with .Values.azamraBff.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.azamraBff.ingress.className }}
+  {{- if .Values.azamraBff.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.azamraBff.ingress.host }}
+      secretName: {{ .Values.azamraBff.ingress.tls.secretName | default (printf "%s-tls" "azamra-bff") }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.azamraBff.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: azamra-bff
+                port:
+                  number: {{ .Values.azamraBff.port }}
+{{- end }}

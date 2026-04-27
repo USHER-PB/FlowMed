@@ -1,0 +1,78 @@
+{{- if and .Values.userStorage.enabled .Values.userStorage.initDatabase.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: user-storage-init-db
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: user-storage
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        app: user-storage-init-db
+    spec:
+      restartPolicy: Never
+      {{- include "azamra-edge.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: init-db
+          image: postgres:15-alpine
+          securityContext:
+            runAsUser: 999
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: PGHOST
+              value: {{ .Values.userStorage.initDatabase.host | default "data-store-postgres-rw" }}
+            - name: PGPORT
+              value: {{ .Values.userStorage.initDatabase.port | default "5432" | quote }}
+            - name: PGUSER
+              value: {{ .Values.userStorage.initDatabase.adminUser | default "db_admin" }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.initDatabase.adminSecret | default "db-admin-credentials" }}
+                  key: {{ .Values.userStorage.initDatabase.adminSecretKey | default "password" }}
+            - name: DB_NAME
+              value: {{ .Values.userStorage.initDatabase.database | default "user_storage" }}
+            - name: DB_USER
+              value: {{ .Values.userStorage.initDatabase.user | default "user_storage" }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.userStorage.existingSecret }}
+                  key: USER_STORAGE_DB_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Checking if database ${DB_NAME} exists..."
+              if psql -U ${PGUSER} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+                echo "Database ${DB_NAME} already exists"
+              else
+                echo "Creating database ${DB_NAME}..."
+                psql -U ${PGUSER} -d postgres -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';"
+                psql -U ${PGUSER} -d postgres -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
+                echo "Database ${DB_NAME} created successfully"
+              fi
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+{{- end }}

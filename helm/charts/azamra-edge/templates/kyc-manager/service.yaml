@@ -1,0 +1,19 @@
+{{- if .Values.azamraKycManager.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: azamra-kyc-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-kyc-manager
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.azamraKycManager.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: azamra-kyc-manager
+{{- end }}

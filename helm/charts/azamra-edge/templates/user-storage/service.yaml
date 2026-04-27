@@ -1,0 +1,19 @@
+{{- if .Values.userStorage.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: user-storage
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.userStorage.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: user-storage
+{{- end }}

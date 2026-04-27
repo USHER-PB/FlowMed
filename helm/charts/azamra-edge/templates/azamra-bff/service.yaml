@@ -1,0 +1,19 @@
+{{- if .Values.azamraBff.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: azamra-bff
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: azamra-bff
+    {{- include "azamra-edge.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.azamraBff.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: azamra-bff
+{{- end }}

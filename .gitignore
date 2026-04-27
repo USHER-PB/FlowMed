@@ -47,8 +47,10 @@ prompts/
 *.swo
 TODO.md
 
-# Helm build artifacts
+# Helm chart dependencies (fetched via helm dependency update)
+**/charts/charts/
 **/charts/*.tgz
+Chart.lock
 **/Chart.lock
 
 # Ignore embedded chart dependencies (upstream charts downloaded by helm dependency update)
