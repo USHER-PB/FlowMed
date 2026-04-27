@@ -258,6 +258,20 @@ clients:
     standardFlowEnabled: false
     implicitFlowEnabled: false
     directAccessGrantsEnabled: false
+
+  # 3. Resource Server Placeholder
+  - clientId: resource-server
+    name: Fineract Resource Server
+    description: Logical audience target for Fineract service-account tokens
+    enabled: true
+    publicClient: false
+    clientAuthenticatorType: client-secret
+    secret: "resource-server-secret"
+    protocol: openid-connect
+    standardFlowEnabled: false
+    implicitFlowEnabled: false
+    directAccessGrantsEnabled: false
+    fullScopeAllowed: false
     serviceAccountsEnabled: true
     defaultClientScopes:
       - profile

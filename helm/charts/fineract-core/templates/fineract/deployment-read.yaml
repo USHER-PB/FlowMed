@@ -115,6 +115,7 @@ spec:
               value: {{ .Values.redis.port | quote }}
             - name: FINERACT_REDIS_DATABASE
               value: {{ .Values.redis.database | quote }}
+            {{- include "fineract-core.fineractOauthEnv" . | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

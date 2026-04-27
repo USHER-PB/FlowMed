@@ -186,6 +186,8 @@ config:
     tenant: "default"
     username: "mifos"
     password: ""  # Set via sealed-secret
+    authType: "oauth"
+    tokenUrl: "http://keycloak:8080/realms/fineract/protocol/openid-connect/token"
 
   # Database configuration
   database:

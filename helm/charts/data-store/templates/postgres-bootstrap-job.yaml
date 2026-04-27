@@ -1,0 +1,112 @@
+{{- if and .Values.postgres.enabled (eq .Values.postgres.mode "cnpg") .Values.postgres.cnpg.bootstrap.enabled (gt (len .Values.postgres.cnpg.bootstrap.databases) 0) -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "data-store.fullname" . }}-postgres-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-store.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-bootstrap
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "data-store.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres-bootstrap
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: PGHOST
+              value: {{ include "data-store.postgresHost" . | quote }}
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.cnpg.bootstrap.adminSecret.name | quote }}
+                  key: {{ .Values.postgres.cnpg.bootstrap.adminSecret.userKey | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.cnpg.bootstrap.adminSecret.name | quote }}
+                  key: {{ .Values.postgres.cnpg.bootstrap.adminSecret.passwordKey | quote }}
+            {{- range $index, $db := .Values.postgres.cnpg.bootstrap.databases }}
+            - name: DB_{{ $index }}_NAME
+              value: {{ $db.name | quote }}
+            - name: DB_{{ $index }}_USER
+              value: {{ default $db.name $db.user | quote }}
+            - name: DB_{{ $index }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecret.name | quote }}
+                  key: {{ $db.passwordSecret.key | default "password" | quote }}
+            {{- end }}
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              set -eu
+
+              echo "Waiting for PostgreSQL to become ready..."
+              until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+                sleep 2
+              done
+
+              {{- range $index, $_ := .Values.postgres.cnpg.bootstrap.databases }}
+              eval "DB_NAME=\${DB_{{ $index }}_NAME}"
+              eval "DB_USER=\${DB_{{ $index }}_USER}"
+              eval "DB_PASSWORD=\${DB_{{ $index }}_PASSWORD}"
+              DB_PASSWORD_ESCAPED=$(printf '%s' "$DB_PASSWORD" | sed "s/'/''/g")
+
+              echo "Ensuring role and database: ${DB_USER} / ${DB_NAME}"
+              if [ "$DB_USER" != "$PGUSER" ]; then
+                ROLE_EXISTS=$(psql -U "$PGUSER" -d "$PGDATABASE" -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")
+                if [ "$ROLE_EXISTS" = "1" ]; then
+                  psql -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "ALTER ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASSWORD_ESCAPED}';"
+                else
+                  psql -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "CREATE ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASSWORD_ESCAPED}';"
+                fi
+
+                psql -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "GRANT ${DB_USER} TO ${PGUSER};"
+              fi
+
+              DB_EXISTS=$(psql -U "$PGUSER" -d "$PGDATABASE" -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")
+              if [ "$DB_EXISTS" = "1" ]; then
+                psql -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};"
+              else
+                psql -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
+              fi
+              {{- end }}
+
+              echo "PostgreSQL bootstrap completed successfully"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+{{- end }}

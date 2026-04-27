@@ -67,13 +67,13 @@ spec:
             - name: FINERACT_API_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: {{ .Values.secrets.fineractApi.usernameKey | default "username" }}
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: username
             - name: FINERACT_API_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.fineractApi.secretName }}
-                  key: {{ .Values.secrets.fineractApi.passwordKey | default "password" }}
+                  name: {{ .Values.secrets.database.secretName }}
+                  key: {{ .Values.secrets.database.passwordKey | default "password" }}
             # Sync configuration
             - name: SYNC_INTERVAL_SECONDS
               value: {{ .Values.userSync.syncIntervalSeconds | quote }}

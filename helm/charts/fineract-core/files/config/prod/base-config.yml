@@ -1,0 +1,797 @@
+tenant: default
+
+systemConfig:
+  currency:
+    code: XAF
+    name: Central African CFA Franc
+    decimalPlaces: 2
+  workingDays:
+    recurrence: FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+    repaymentReschedulingType: MOVE_TO_NEXT_WORKING_DAY
+    extendTermForDailyRepayments: false
+  globalConfig:
+    - name: maker-checker
+      enabled: true
+    - name: enable-business-date
+      enabled: true
+    - name: enable-auto-generated-external-id
+      enabled: true
+    - name: financial-year-beginning-month
+      enabled: true
+      value: 1
+    - name: allow-transactions-on-non-workingday
+      enabled: false
+    - name: allow-transactions-on-holiday
+      enabled: false
+  codes:
+    - name: Gender
+      values:
+        - name: Male
+          position: 1
+          isActive: true
+        - name: Female
+          position: 2
+          isActive: true
+        - name: Other
+          position: 3
+          isActive: true
+    - name: ClientType
+      values:
+        - name: Individual
+          position: 1
+          isActive: true
+        - name: Corporate
+          position: 2
+          isActive: true
+    - name: ClientClassification
+      values:
+        - name: Active
+          position: 1
+          isActive: true
+  accountNumberPreferences:
+    - accountType: CLIENT
+      prefixType: 1
+    - accountType: SAVINGS
+      prefixType: 301
+
+chartOfAccounts:
+  - name: Share Capital
+    glCode: 101
+    accountType: Equity
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Paid-up share capital
+  - name: Retained Earnings
+    glCode: 102
+    accountType: Equity
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Accumulated retained earnings
+  - name: Company Asset Capital
+    glCode: 103
+    accountType: Equity
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Equity origin for minted/issued digital asset units
+  - name: Financial Products
+    glCode: 201
+    accountType: Asset
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent account for all financial product types
+  - name: Digital Asset Inventory
+    glCode: 301
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: LP vault holding of digital asset units across all asset types
+  - name: Asset Transfer Suspense
+    glCode: 302
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Clearing account for in-flight asset transfers
+  - name: LP Accounts
+    glCode: 401
+    accountType: Liability
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - money owed to Liquidity Providers
+  - name: LP Settlement Control
+    glCode: 4011
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: XAF owed to LPs from asset settlements
+    parentGlCode: 401
+  - name: LP Spread Payable
+    glCode: 4012
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: LP spread revenue held by Azamra until settled
+    parentGlCode: 401
+  - name: LP Tax Withholding
+    glCode: 4013
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Tax withheld from LPs on sell transactions
+    parentGlCode: 401
+  - name: Client Accounts
+    glCode: 410
+    accountType: Liability
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - money owed to clients
+  - name: Client Savings Control
+    glCode: 4101
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: XAF owed to clients
+    parentGlCode: 410
+  - name: Client Digital Asset Holdings
+    glCode: 4102
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Token units owed to clients
+    parentGlCode: 410
+  - name: Platform Fee Payable
+    glCode: 4201
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Azamra collected platform fees pending settlement
+  - name: Tax Payable
+    glCode: 430
+    accountType: Liability
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - taxes payable to government
+  - name: Tax Payable - Registration Duty
+    glCode: 4301
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Registration duty payable to DGI
+    parentGlCode: 430
+  - name: Tax Payable - IRCM
+    glCode: 4302
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Withholding tax on investment income payable to DGI
+    parentGlCode: 430
+  - name: Tax Payable - Capital Gains
+    glCode: 4303
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Capital gains tax payable to DGI
+    parentGlCode: 430
+  - name: Tax Payable - TVA
+    glCode: 4304
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Value-added tax payable to DGI
+    parentGlCode: 430
+  - name: Fixed Deposit Accounts
+    glCode: 4401
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Fixed deposit liabilities
+  - name: Savings Interest Payable
+    glCode: 4402
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Accrued interest payable to savers
+  - name: Transfers in Suspense
+    glCode: 4501
+    accountType: Liability
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: In-flight inter-account transfers
+  - name: Azamra MoMo Trust
+    glCode: 500
+    accountType: Asset
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - client money held in mobile money trust
+  - name: MTN Mobile Money
+    glCode: 5001
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: MTN MoMo trust balance
+    parentGlCode: 500
+  - name: Orange Money
+    glCode: 5002
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Orange Money trust balance
+    parentGlCode: 500
+  - name: Azamra Bank Trust
+    glCode: 501
+    accountType: Asset
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - LP money held in bank trust accounts
+  - name: UBA Bank Account
+    glCode: 5011
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: UBA bank trust account for LP settlements
+    parentGlCode: 501
+  - name: Afriland Bank Account
+    glCode: 5012
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Afriland bank account
+    parentGlCode: 501
+  - name: Azamra Cash Register
+    glCode: 502
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Azamra operational cash register
+  - name: Azamra Tax Payment Account
+    glCode: 503
+    accountType: Asset
+    accountUsage: Header
+    manualEntriesAllowed: false
+    description: Parent - bank accounts used for tax payments
+  - name: Afriland Tax Account
+    glCode: 5031
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Afriland bank account for DGI tax payments
+    parentGlCode: 503
+  - name: Loans to Clients - Principal
+    glCode: 511
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Outstanding loan principal
+  - name: Loans to Clients - Interest Receivable
+    glCode: 512
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Accrued interest receivable
+  - name: Loans to Clients - Fees Receivable
+    glCode: 513
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Accrued fees receivable
+  - name: Loans to Clients - Penalties Receivable
+    glCode: 514
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Accrued penalties receivable
+  - name: Provision for Loan Losses
+    glCode: 515
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Accumulated provision for bad loans
+  - name: Due from Other Branches (Receivable)
+    glCode: 521
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Inter-branch receivables
+  - name: Overdraft Portfolio Control
+    glCode: 531
+    accountType: Asset
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Overdraft portfolio control
+  - name: Interest Expense on Savings
+    glCode: 601
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Interest paid to savers
+  - name: Mobile Money Transfer Fees
+    glCode: 602
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Mobile money transaction fees
+  - name: Loan Loss Provision Expense
+    glCode: 603
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Provision for loan losses
+  - name: Loan Write-off Expense
+    glCode: 604
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Written-off loans
+  - name: Staff Salaries
+    glCode: 605
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Employee salaries and wages
+  - name: Office Rent
+    glCode: 606
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Office rental expenses
+  - name: Utilities
+    glCode: 607
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Utilities expenses
+  - name: Tax Expense - Withholding Tax
+    glCode: 608
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Withholding tax on interest
+  - name: Cash Shortage
+    glCode: 609
+    accountType: Expense
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Cash shortages from teller operations
+  - name: Azamra Platform Fee Income
+    glCode: 701
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Azamra collected platform trading fees
+  - name: Interest Income on Loans
+    glCode: 703
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Interest earned from loans
+  - name: Fee Income - Loan Processing
+    glCode: 704
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Loan processing fees
+  - name: Penalty Income
+    glCode: 705
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Late payment penalties
+  - name: Fee Income - Savings Accounts
+    glCode: 706
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: false
+    description: Savings account fees
+  - name: Cash Overage
+    glCode: 707
+    accountType: Income
+    accountUsage: Detail
+    manualEntriesAllowed: true
+    description: Cash overages from teller operations
+
+paymentTypes:
+  - name: Cash
+    description: Cash payment
+    isCashPayment: true
+    position: 1
+  - name: MTN Mobile Money
+    description: MTN MoMo payment
+    isCashPayment: false
+    position: 2
+  - name: Orange Money
+    description: Orange Money payment
+    isCashPayment: false
+    position: 3
+  - name: Bank Transfer
+    description: Bank transfer payment
+    isCashPayment: false
+    position: 4
+  - name: Cheque
+    description: Cheque payment
+    isCashPayment: false
+    position: 5
+  - name: MTN Transfer
+    description: MTN Mobile Money transfer
+    isCashPayment: false
+    position: 10
+  - name: Orange Transfer
+    description: Orange Money transfer
+    isCashPayment: false
+    position: 11
+  - name: UBA Bank Transfer
+    description: UBA bank transfer
+    isCashPayment: false
+    position: 12
+  - name: Afriland Bank Transfer
+    description: Afriland bank transfer
+    isCashPayment: false
+    position: 13
+  - name: Asset Purchase
+    description: Internal transfer for digital asset buy
+    isCashPayment: false
+    position: 20
+  - name: Asset Sale
+    description: Internal transfer for digital asset sell-back
+    isCashPayment: false
+    position: 21
+  - name: Asset Issuance
+    description: Initial treasury deposit of asset units
+    isCashPayment: false
+    position: 22
+
+financialActivityMappings:
+  - financialActivityName: Asset Transfer
+    glAccountCode: "521"
+  - financialActivityName: Liability Transfer
+    glAccountCode: "4501"
+  - financialActivityName: Cash at Mainvault
+    glAccountCode: "502"
+  - financialActivityName: Cash at Teller
+    glAccountCode: "502"
+  - financialActivityName: Opening Balances Contra
+    glAccountCode: "101"
+  - financialActivityName: Fund Source
+    glAccountCode: "502"
+
+savingsProducts:
+  - name: Voluntary Savings Account
+    shortName: VSAV
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: Client cash holding account for asset trading
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "502"
+    savingsControlAccountCode: "4101"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+    paymentChannelToFundSourceMappings:
+      - paymentTypeName: Cash
+        fundSourceGlCode: "502"
+      - paymentTypeName: MTN Mobile Money
+        fundSourceGlCode: "5001"
+      - paymentTypeName: Orange Money
+        fundSourceGlCode: "5002"
+      - paymentTypeName: MTN Transfer
+        fundSourceGlCode: "5001"
+      - paymentTypeName: Orange Transfer
+        fundSourceGlCode: "5002"
+      - paymentTypeName: UBA Bank Transfer
+        fundSourceGlCode: "5011"
+      - paymentTypeName: Afriland Bank Transfer
+        fundSourceGlCode: "5012"
+      - paymentTypeName: Asset Purchase
+        fundSourceGlCode: "502"
+      - paymentTypeName: Asset Sale
+        fundSourceGlCode: "502"
+  - name: LP Settlement Account
+    shortName: LSAV
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: LP cash settlement account - XAF held in bank trust
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "5011"
+    savingsControlAccountCode: "4011"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+    paymentChannelToFundSourceMappings:
+      - paymentTypeName: UBA Bank Transfer
+        fundSourceGlCode: "5011"
+      - paymentTypeName: Afriland Bank Transfer
+        fundSourceGlCode: "5012"
+      - paymentTypeName: Asset Purchase
+        fundSourceGlCode: "5011"
+      - paymentTypeName: Asset Sale
+        fundSourceGlCode: "5011"
+      - paymentTypeName: Asset Issuance
+        fundSourceGlCode: "5011"
+  - name: LP Spread Account
+    shortName: LSPD
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: LP accumulated spread margin held by Azamra until settled
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "5011"
+    savingsControlAccountCode: "4012"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+  - name: LP Tax Withholding Account
+    shortName: LTAX
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: Tax withheld from LP on sell transactions
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "5031"
+    savingsControlAccountCode: "4013"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+  - name: Platform Fee Account
+    shortName: PFEE
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: Azamra platform fee collection account
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "502"
+    savingsControlAccountCode: "4201"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+  - name: DGI Tax Collection Account
+    shortName: DTAX
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: DGI tax authority collection account
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "5031"
+    savingsControlAccountCode: "4301"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+  - name: Clearing Account
+    shortName: CLRG
+    currencyCode: XAF
+    digitsAfterDecimal: 0
+    nominalAnnualInterestRate: 0.0
+    interestCompoundingPeriodType: Monthly
+    interestPostingPeriodType: Monthly
+    interestCalculationType: Daily Balance
+    interestCalculationDaysInYearType: 365
+    accountingRule: CASH_BASED
+    description: Transient clearing account for BUY trade routing
+    overdraftAllowed: false
+    withdrawalFeeForTransfers: false
+    allowDormancyTracking: false
+    savingsReferenceAccountCode: "502"
+    savingsControlAccountCode: "4501"
+    interestOnSavingsAccountCode: "601"
+    incomeFromFeesAccountCode: "701"
+    incomeFromPenaltiesAccountCode: "701"
+    overdraftPortfolioControlAccountCode: "531"
+    incomeFromInterestAccountCode: "703"
+    writeOffAccountCode: "604"
+    transfersInSuspenseAccountCode: "4501"
+
+roles:
+  - name: Branch Manager
+    description: Full client management
+    disabled: false
+    permissions:
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - READ
+      - READ
+      - READ
+      - CREATE_READ
+      - ALL_FUNCTIONS
+      - CHECKER_SUPER_USER
+  - name: Loan Officer
+    description: Create and update clients
+    disabled: false
+    permissions:
+      - CREATE_UPDATE_READ
+      - CREATE_UPDATE_READ
+      - DELETE_FUNCTIONS
+      - DISBURSE_REPAYMENT
+      - CREATE_UPDATE_READ
+      - CREATE_READ
+      - READ
+      - READ
+  - name: Cashier
+    description: View client information only
+    disabled: false
+    permissions:
+      - READ
+      - READ
+      - TRANSACTION
+      - CREATE_READ
+      - READ
+      - READ
+  - name: System Administrator
+    description: Create and manage offices/branches
+    disabled: false
+    permissions:
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - ALL_FUNCTIONS
+      - CREATE_UPDATE_READ
+      - READ
+      - READ
+      - READ
+      - ENABLE_MAKERCHECKER
+  - name: Accountant
+    description: Create and manage GL accounts and journal entries
+    disabled: false
+    permissions:
+      - ALL_FUNCTIONS
+      - READ
+      - READ
+      - READ
+      - READ
+      - READ
+      - READ
+      - CHECKER_SUPER_USER
+
+offices:
+  - name: Head Office
+    externalId: "1"
+    openingDate: "2009-01-01"
+
+savingsAccounts:
+- clientExternalId: PLATFORM-CLIENT
+  productShortName: PFEE
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: PLATFORM-FEE-COLLECT
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1
+# Platform clearing account used by asset-service for buy-side routing.
+- clientExternalId: PLATFORM-CLIENT
+  productShortName: CLRG
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: PLATFORM-CLEARING
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1
+# DGI tax authority accounts.
+- clientExternalId: TAX-AUTHORITY
+  productShortName: DTAX
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: TAX-REG-DUTY
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1
+- clientExternalId: TAX-AUTHORITY
+  productShortName: DTAX
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: TAX-IRCM
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1
+- clientExternalId: TAX-AUTHORITY
+  productShortName: DTAX
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: TAX-CAP-GAINS
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1
+- clientExternalId: TAX-AUTHORITY
+  productShortName: DTAX
+  submittedOnDate:
+  - 2024
+  - 3
+  - 1
+  externalId: TAX-TVA
+  fieldOfficerName: System Admin
+  active: true
+  activatedOnDate:
+  - 2024
+  - 3
+  - 1

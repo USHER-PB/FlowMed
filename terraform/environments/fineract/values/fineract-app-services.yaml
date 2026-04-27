@@ -1,0 +1,385 @@
+asset-service:
+  autoscaling:
+    enabled: false
+    maxReplicas: 3
+    minReplicas: 1
+    targetCPUUtilizationPercentage: 70
+  config:
+    accounting:
+      feeCollectionAccountExternalId: PLATFORM-CLEARING
+    assetIssuancePaymentType: Asset Issuance
+    database:
+      hikari:
+        connectionTimeout: "3000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+        maximumPoolSize: "20"
+        minimumIdle: "5"
+      host: data-store-postgres-rw
+      name: asset_service
+      password: ""
+      port: 5432
+      url: jdbc:postgresql://data-store-postgres-rw:5432/asset_service
+      username: asset_service
+    fineract:
+      host: fineract-core-write
+      password: ""
+      authType: oauth
+      tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
+      port: 8080
+      tenant: default
+      url: https://fineract-core-write:8080
+      username: mifos
+    glAccounts:
+      customerDigitalAssetHoldings: "4102"
+      digitalAssetInventory: "301"
+      expenseAccount: "601"
+      feeIncome: "701"
+      fundSource: "502"
+      incomeFromInterest: "701"
+      platformFeePayable: "4201"
+      savingsControl: "4101"
+      transfersInSuspense: "4501"
+    keycloak:
+      clientId: asset-service
+      clientSecret: ""
+      port: 8080
+      realm: fineract
+      url: http://keycloak:8080
+    lpGlAccounts:
+      fundSource: "5011"
+      savingsControl: "4011"
+      spreadPayable: "4012"
+      taxWithholding: "4013"
+      transfersInSuspense: "4501"
+    lpSavingsProductShortName: LSAV
+    lpSpreadProductShortName: LSPD
+    lpTaxProductShortName: LTAX
+    marketHours:
+      close: "23:59"
+      open: "00:00"
+      weekendTradingEnabled: true
+    rateLimitEnabled: "true"
+    redis:
+      enabled: true
+      existingSecret: infra-cache-redis-auth
+      host: infra-cache-redis
+      port: 6379
+    security:
+      corsAllowedOrigins: http://localhost:4209,http://localhost:3000,http://localhost:5173,http://localhost:8080
+      permitAllAdmin: "false"
+    tax:
+      authorityExternalId: TAX-AUTHORITY
+      capitalGainsAccountExternalId: TAX-CAP-GAINS
+      capitalGainsAnnualExemption: "500000"
+      defaultCapitalGainsRate: "0.165"
+      defaultIrcmBondRate: "0.055"
+      defaultIrcmBvmacRate: "0.11"
+      defaultIrcmDividendRate: "0.165"
+      defaultRegistrationDutyRate: "0.02"
+      defaultTvaRate: "0.1925"
+      ircmAccountExternalId: TAX-IRCM
+      registrationDutyAccountExternalId: TAX-REG-DUTY
+      tvaAccountExternalId: TAX-TVA
+  database:
+    name: asset_service
+    password: ""
+    username: asset_service
+  enabled: true
+  existingSecret: asset-service-credentials
+  fineract:
+    password: ""
+  fullJit: false
+  image:
+    pullPolicy: Always
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/asset-service
+    tag: 768042b0
+  imagePullSecrets:
+    - name: ghcr-credentials
+  javaOpts: -Xmx320m -Xms160m
+  keycloak:
+    clientId: asset-service
+    clientSecret: ""
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  service:
+    managementPort: 8084
+    port: 8083
+    type: ClusterIP
+  startupProbe:
+    failureThreshold: 120
+  tracing:
+    samplingProbability: "1.0"
+
+customer-self-service:
+  autoscaling:
+    enabled: false
+    maxReplicas: 2
+    minReplicas: 1
+    targetCPUUtilizationPercentage: 70
+  config:
+    database:
+      hikari:
+        connectionTimeout: "5000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+        maximumPoolSize: "10"
+        minimumIdle: "3"
+      host: data-store-postgres-rw
+      name: customer_registration
+      password: ""
+      port: 5432
+      url: jdbc:postgresql://data-store-postgres-rw:5432/customer_registration
+      username: customer_reg
+    fineract:
+      host: fineract-core-write
+      password: ""
+      port: 8080
+      tenant: default
+      url: https://fineract-core-write:8080
+      username: mifos
+    keycloak:
+      clientId: customer-registration
+      clientSecret: ""
+      port: 8080
+      realm: fineract
+      url: http://keycloak:8080
+    kyc:
+      defaultGroupPath: /self-service-customers
+      defaultKycStatus: pending
+      defaultKycTier: "1"
+      defaultOfficeId: "1"
+    redis:
+      enabled: true
+      existingSecret: infra-cache-redis-auth
+      host: infra-cache-redis
+      port: 6379
+  database:
+    name: customer_registration
+    password: ""
+    username: customer_reg
+  enabled: true
+  existingSecret: customer-self-service-credentials
+  fineract:
+    password: ""
+    username: mifos
+  image:
+    pullPolicy: Always
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/customer-self-service
+    tag: 169deecc
+  imagePullSecrets:
+    - name: ghcr-credentials
+  javaOpts: -Xmx160m -Xms80m
+  keycloak:
+    clientId: customer-registration
+    clientSecret: ""
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 320Mi
+    requests:
+      cpu: 50m
+      memory: 160Mi
+  service:
+    port: 8080
+    type: ClusterIP
+  tracing:
+    samplingProbability: "1.0"
+
+fullnameOverride: ""
+
+global:
+  fineractUrl: https://fineract-core-write:8080/fineract-provider
+  imagePullSecrets:
+    - name: ghcr-credentials
+  keycloakPublicUrl: http://localhost:8180
+  keycloakUrl: http://keycloak:8080
+  otelEndpoint: http://otel-collector:4317
+  postgres:
+    host: data-store-postgres-rw
+    port: 5432
+  realm: fineract
+  redis:
+    host: infra-cache-redis
+    port: 6379
+  storage:
+    accessKey: ""
+    bucket: fineract-assets
+    endpoint: http://data-store-minio:9000
+    publicBaseUrl: http://localhost:9000/fineract-assets
+    region: us-east-1
+    secretKey: ""
+
+nameOverride: ""
+
+networkPolicies:
+  enabled: true
+
+payment-gateway:
+  autoscaling:
+    enabled: false
+    maxReplicas: 3
+    minReplicas: 1
+    targetCPUUtilizationPercentage: 70
+  config:
+    database:
+      hikari:
+        connectionTimeout: "5000"
+        idleTimeout: "60000"
+        maxLifetime: "1800000"
+        maximumPoolSize: "10"
+        minimumIdle: "3"
+      host: data-store-postgres-rw
+      name: payment_gateway
+      password: ""
+      port: 5432
+      url: jdbc:postgresql://data-store-postgres-rw:5432/payment_gateway
+      username: payment_gateway
+    fineract:
+      host: fineract-core-write
+      password: ""
+      port: 8080
+      savingsProductId: "1"
+      tenant: default
+      url: https://fineract-core-write:8080
+      username: mifos
+    keycloak:
+      clientId: payment-gateway
+      clientSecret: ""
+      port: 8080
+      realm: fineract
+      url: http://keycloak:8080
+    redis:
+      enabled: true
+      existingSecret: infra-cache-redis-auth
+      host: infra-cache-redis
+      port: 6379
+  database:
+    name: payment_gateway
+    password: ""
+    username: payment_gateway
+  enabled: true
+  existingSecret: payment-gateway-credentials
+  fineract:
+    password: ""
+    savingsProductId: "1"
+    username: mifos
+  image:
+    pullPolicy: Always
+    registry: ghcr.io
+    repository: adorsys-gis/fineract-apps/payment-gateway-service
+    tag: 4382f407
+  imagePullSecrets:
+    - name: ghcr-credentials
+  javaOpts: -Xmx256m -Xms128m
+  keycloak:
+    clientId: payment-gateway
+    clientSecret: ""
+  providers:
+    cinetpay:
+      apiKey: ""
+      baseUrl: https://api-checkout.cinetpay.com
+      enabled: false
+      siteId: "0"
+    mtn:
+      apiKey: ""
+      apiUserId: ""
+      baseUrl: https://sandbox.momodeveloper.mtn.com
+      callbackUrl: ""
+      collectionKey: ""
+      disbursementKey: ""
+      enabled: false
+      glAccountCode: "5001"
+      targetEnv: sandbox
+    nokash:
+      appSpaceKey: ""
+      baseUrl: https://api.nokash.app
+      callbackUrl: ""
+      enabled: false
+      fineractPaymentTypeId: "3"
+      glAccountCode: "5003"
+      iSpaceKey: ""
+    orange:
+      baseUrl: https://api.orange.com/orange-money-webpay/dev/v1
+      clientId: ""
+      clientSecret: ""
+      enabled: false
+      glAccountCode: "5002"
+      merchantCode: ""
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 448Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  service:
+    port: 8082
+    type: ClusterIP
+
+secrets:
+  mode: existing
+
+serviceAccount:
+  annotations: {}
+  create: true
+  name: ""
+
+sms-gateway:
+  autoscaling:
+    enabled: false
+    maxReplicas: 5
+    minReplicas: 1
+    targetCPUUtilizationPercentage: 70
+  config:
+    database:
+      host: data-store-postgres-rw
+      name: user_storage
+      port: 5432
+    sms:
+      provider: avlytext
+    storage:
+      bucket: sms-storage
+      endpoint: http://data-store-minio:9000
+  enabled: true
+  existingSecret: sms-gateway-credentials
+  image:
+    pullPolicy: Always
+    registry: ghcr.io
+    repository: adorsys-gis/sms-gateway
+    tag: latest
+  imagePullSecrets:
+    - name: ghcr-credentials
+  providers:
+    avlytext:
+      apiKey: ""
+      baseUrl: https://api.avlytext.com
+      enabled: true
+      senderId: OMPlatform
+    orange:
+      baseUrl: https://api.orange.com/sms
+      clientId: ""
+      clientSecret: ""
+      enabled: false
+      senderId: OMPlatform
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  service:
+    port: 8080
+    type: ClusterIP

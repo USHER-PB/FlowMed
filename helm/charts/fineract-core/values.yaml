@@ -7,6 +7,7 @@
 # - OAuth2-Proxy for authentication
 # - User Sync Service for Keycloak integration
 # - Config CLI Job for bootstrap configuration
+# - Fineract Config Import Job for GL accounts, payment types, and savings products
 # =============================================================================
 
 # =============================================================================
@@ -73,6 +74,12 @@ fineract:
       limits:
         cpu: 2000m
         memory: 2Gi
+
+  oauth:
+    enabled: true
+    basicAuthEnabled: false
+    issuerUri: http://auth.fineract.local/realms/fineract
+    jwkSetUri: http://keycloak.example.com/realms/fineract/protocol/openid-connect/certs
 
 # =============================================================================
 # Database Configuration
@@ -175,8 +182,9 @@ oauth2Proxy:
   keycloak:
     url: https://keycloak.example.com
     realm: fineract
-    clientId: fineract-api
+    clientId: oauth2-proxy
     # clientSecret should be set via secrets.oauth2Proxy.clientSecret
+  annotations: {}
   redirectUrl: https://api.fineract.example.com/oauth2/callback
   externalUrl: https://api.fineract.example.com
   redis:
@@ -229,6 +237,34 @@ userSync:
     realm: fineract
 
 # =============================================================================
+# Fineract Config Import Job
+# =============================================================================
+
+fineractConfig:
+  enabled: false
+  environment: prod
+  image:
+    repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
+    tag: "develop-032d192"
+    pullPolicy: IfNotPresent
+  auth:
+    tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
+    clientId: fineract-data-loader
+  javaOpts: "-Xmx512m -Xms256m"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  import:
+    force: false
+    failOnError: false
+    checksumBehavior: "continue"
+    managedMode: "no-delete"
+
+# =============================================================================
 # Config CLI Job Configuration
 # =============================================================================
 
@@ -251,7 +287,7 @@ configCli:
     roles: []
   auth:
     tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
-    clientId: fineract-config
+    clientId: fineract-data-loader
 
 # =============================================================================
 # Secrets Configuration
@@ -296,6 +332,7 @@ secrets:
     # Name of the SealedSecret containing OAuth2 Proxy secrets
     # Required keys: clientId, clientSecret, cookieSecret
     secretName: fineract-oauth2-proxy-sealed
+    cookieSecretKey: cookieSecret
   fineractApi:
     # Name of the SealedSecret containing Fineract API credentials
     # Required keys: username, password

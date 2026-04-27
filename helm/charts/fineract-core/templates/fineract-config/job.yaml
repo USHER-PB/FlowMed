@@ -1,0 +1,188 @@
+{{- if .Values.fineractConfig.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-fineract-config
+  labels:
+    {{- include "fineract-core.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fineract-config
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "20"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    checksum/config: {{ .Files.Glob (printf "files/config/%s/*.yml" (.Values.fineractConfig.environment | default "prod")) | toJson | sha256sum }}
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        {{- include "fineract-core.labels" . | nindent 8 }}
+        app.kubernetes.io/component: fineract-config
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-keycloak-realm
+          image: busybox:1.36.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Keycloak realm..."
+              TOKEN_URL="{{ .Values.fineractConfig.auth.tokenUrl }}"
+              ATTEMPT=0
+              MAX=60
+              until [ $ATTEMPT -ge $MAX ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+                RESP=$(wget -q -O - --post-data "grant_type=client_credentials&client_id={{ .Values.fineractConfig.auth.clientId }}&client_secret=probe" "$TOKEN_URL" 2>&1 || true)
+                if echo "$RESP" | grep -q "access_token\|error"; then
+                  echo "Keycloak realm ready (attempt $ATTEMPT)"
+                  exit 0
+                fi
+                [ $((ATTEMPT % 6)) -eq 0 ] && echo "Still waiting... ${ATTEMPT}/${MAX}"
+                sleep 10
+              done
+              echo "ERROR: Keycloak realm not ready after $((MAX * 10))s"
+              exit 1
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
+        - name: wait-for-fineract
+          image: busybox:1.36.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Fineract write service..."
+              ATTEMPT=0
+              MAX=60
+              until [ $ATTEMPT -ge $MAX ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+                if nc -z {{ include "fineract-core.fullname" . }}-write 8080 2>/dev/null; then
+                  echo "Fineract ready (attempt $ATTEMPT)"
+                  sleep 10
+                  exit 0
+                fi
+                [ $((ATTEMPT % 12)) -eq 0 ] && echo "Still waiting... ${ATTEMPT}/${MAX}"
+                sleep 5
+              done
+              echo "ERROR: Fineract not ready after $((MAX * 5))s"
+              exit 1
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
+      containers:
+        - name: fineract-config
+          image: "{{ .Values.fineractConfig.image.repository }}:{{ .Values.fineractConfig.image.tag }}"
+          imagePullPolicy: {{ .Values.fineractConfig.image.pullPolicy | default "IfNotPresent" }}
+          workingDir: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: HOME
+              value: /tmp
+            - name: FINERACT_BASE_URL
+              value: 'https://{{ include "fineract-core.fullname" . }}-write:8080/fineract-provider'
+            - name: FINERACT_TENANT
+              value: "default"
+            - name: FINERACT_SSL_VERIFY
+              value: "false"
+            - name: FINERACT_AUTH_TYPE
+              value: "oauth2"
+            - name: FINERACT_AUTH_OAUTH2_TOKEN_URL
+              value: {{ .Values.fineractConfig.auth.tokenUrl | quote }}
+            - name: FINERACT_AUTH_OAUTH2_CLIENT_ID
+              value: {{ .Values.fineractConfig.auth.clientId | quote }}
+            - name: FINERACT_AUTH_OAUTH2_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.fineractApi.secretName }}
+                  key: {{ .Values.secrets.fineractApi.oauth2ClientSecretKey | default "oauth2-client-secret" }}
+            - name: FINERACT_AUTH_OAUTH2_GRANT_TYPE
+              value: "client_credentials"
+            - name: IMPORT_FILES_LOCATIONS
+              value: "/config/*.yml"
+            - name: IMPORT_VALIDATE
+              value: "true"
+            - name: IMPORT_PARALLEL
+              value: "false"
+            - name: IMPORT_FORCE
+              value: {{ .Values.fineractConfig.import.force | default false | quote }}
+            - name: IMPORT_DRY_RUN
+              value: "false"
+            - name: IMPORT_AUTO_IMPORT_ENABLED
+              value: "true"
+            - name: IMPORT_EXIT_AFTER_IMPORT
+              value: "true"
+            - name: IMPORT_FAIL_ON_ERROR
+              value: {{ .Values.fineractConfig.import.failOnError | default false | quote }}
+            - name: IMPORT_REMOTE_STATE_ENABLED
+              value: "true"
+            - name: IMPORT_REMOTE_STATE_CHECKSUM_BEHAVIOR
+              value: {{ .Values.fineractConfig.import.checksumBehavior | default "continue" | quote }}
+            - name: IMPORT_VAR_SUBSTITUTION_ENABLED
+              value: "false"
+            {{- $managedMode := .Values.fineractConfig.import.managedMode | default "no-delete" }}
+            - name: IMPORT_MANAGED_OFFICE
+              value: {{ $managedMode | quote }}
+            - name: IMPORT_MANAGED_ROLE
+              value: {{ $managedMode | quote }}
+            - name: IMPORT_MANAGED_STAFF
+              value: {{ $managedMode | quote }}
+            - name: IMPORT_MANAGED_CLIENT
+              value: {{ $managedMode | quote }}
+            - name: IMPORT_MANAGED_LOANPRODUCT
+              value: {{ $managedMode | quote }}
+            - name: IMPORT_MANAGED_SAVINGSPRODUCT
+              value: {{ $managedMode | quote }}
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.fineractConfig.javaOpts | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: {{ .Values.fineractConfig.resources.requests.memory | quote }}
+              cpu: {{ .Values.fineractConfig.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.fineractConfig.resources.limits.memory | quote }}
+              cpu: {{ .Values.fineractConfig.resources.limits.cpu | quote }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "fineract-core.fullname" . }}-fineract-config-data
+        - name: tmp
+          emptyDir: {}
+{{- end }}

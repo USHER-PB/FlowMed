@@ -1,0 +1,15 @@
+{{- if .Values.fineractConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fineract-core.fullname" . }}-fineract-config-data
+  labels:
+    {{- include "fineract-core.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fineract-config
+data:
+  {{- $configDir := printf "files/config/%s/*.yml" (.Values.fineractConfig.environment | default "prod") }}
+  {{- range $path, $_ := .Files.Glob $configDir }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
+{{- end }}

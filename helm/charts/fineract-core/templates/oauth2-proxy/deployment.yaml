@@ -27,6 +27,10 @@ spec:
     metadata:
       labels:
         {{- include "fineract-core.oauth2Proxy.selectorLabels" . | nindent 8 }}
+      {{- with .Values.oauth2Proxy.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -60,16 +64,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.oauth2Proxy.secretName }}
                   key: {{ .Values.secrets.oauth2Proxy.clientSecretKey | default "clientSecret" }}
-            {{- if .Values.secrets.oauth2Proxy.cookieSecretKey }}
             - name: OAUTH2_PROXY_COOKIE_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.oauth2Proxy.secretName }}
                   key: {{ .Values.secrets.oauth2Proxy.cookieSecretKey }}
-            {{- else if .Values.oauth2Proxy.cookieSecret }}
-            - name: OAUTH2_PROXY_COOKIE_SECRET
-              value: {{ .Values.oauth2Proxy.cookieSecret | quote }}
-            {{- end }}
             {{- if .Values.oauth2Proxy.redis.enabled }}
             - name: OAUTH2_PROXY_REDIS_CONNECTION_URL
               value: {{ .Values.oauth2Proxy.redis.connectionUrl | quote }}

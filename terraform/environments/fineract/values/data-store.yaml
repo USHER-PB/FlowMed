@@ -1,0 +1,67 @@
+## Environment-specific overrides for the fineract bootstrap environment.
+## Keep the chart defaults generic and centralize bootstrap SQL, secrets,
+## and bucket layout here so Terraform can own the deployment shape.
+
+postgres:
+  auth:
+    database: appdb
+    username: appuser
+    existingSecret: data-store-postgres
+  cnpg:
+    instances: 2
+    bootstrap:
+      enabled: true
+      initdb:
+        postInitSQL:
+          - ALTER ROLE appuser CREATEDB CREATEROLE;
+      adminSecret:
+        name: data-store-postgres
+        userKey: username
+        passwordKey: password
+      databases:
+        - name: asset_service
+          user: asset_service
+          passwordSecret:
+            name: asset-service-credentials
+            key: db-password
+        - name: payment_gateway
+          user: payment_gateway
+          passwordSecret:
+            name: payment-gateway-credentials
+            key: db-password
+        - name: customer_registration
+          user: customer_reg
+          passwordSecret:
+            name: customer-self-service-credentials
+            key: db-password
+        - name: fineract_tenants
+          user: appuser
+          passwordSecret:
+            name: data-store-postgres
+            key: password
+        - name: fineract_default
+          user: appuser
+          passwordSecret:
+            name: data-store-postgres
+            key: password
+        - name: keycloak
+          user: keycloak
+          passwordSecret:
+            name: keycloak-postgres
+            key: KEYCLOAK_DB_PASSWORD
+        - name: user_storage
+          user: user_storage
+          passwordSecret:
+            name: user-storage-credentials
+            key: USER_STORAGE_DB_PASSWORD
+minio:
+  auth:
+    rootUser: minioadmin
+    existingSecret: data-store-minio
+  buckets:
+    - name: fineract-assets
+      policy: none
+    - name: user-storage
+      policy: none
+    - name: backups
+      policy: none

@@ -20,7 +20,9 @@ spec:
         app.kubernetes.io/component: keycloak-init
     spec:
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "fineract-core.serviceAccountName" . }}
+      # Pre-install hooks run before this chart's ServiceAccount exists, so use the
+      # namespace default account here. The long-lived workloads still use the chart SA.
+      serviceAccountName: default
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001

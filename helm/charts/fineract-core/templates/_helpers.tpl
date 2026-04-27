@@ -217,6 +217,22 @@ app.kubernetes.io/component: oauth2-proxy
 {{- end }}
 
 {{/*
+Fineract server OAuth env vars
+*/}}
+{{- define "fineract-core.fineractOauthEnv" -}}
+- name: FINERACT_SECURITY_BASICAUTH_ENABLED
+  value: {{ .Values.fineract.oauth.basicAuthEnabled | default false | quote }}
+- name: FINERACT_SECURITY_OAUTH_ENABLED
+  value: {{ .Values.fineract.oauth.enabled | default true | quote }}
+- name: FINERACT_SERVER_OAUTH_RESOURCE_URL
+  value: {{ .Values.fineract.oauth.issuerUri | quote }}
+- name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+  value: {{ .Values.fineract.oauth.issuerUri | quote }}
+- name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+  value: {{ .Values.fineract.oauth.jwkSetUri | quote }}
+{{- end }}
+
+{{/*
 Selector labels for User Sync component
 */}}
 {{- define "fineract-core.userSync.selectorLabels" -}}

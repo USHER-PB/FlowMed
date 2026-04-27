@@ -1,0 +1,9 @@
+azamraKycManager:
+  publicIssuerAccess:
+    enabled: true
+    ip: 10.107.200.204
+    port: 80
+
+userStorage:
+  initDatabase:
+    enabled: false

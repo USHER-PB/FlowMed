@@ -2,8 +2,9 @@
 # =============================================================================
 # Data Store Umbrella Chart - Default Values
 # =============================================================================
-# Deploys PostgreSQL + MinIO for local development environments.
-# For production, use external RDS and S3 services.
+# Deploys PostgreSQL + MinIO for Kubernetes environments.
+# Keep this file generic so environment overlays can supply the concrete
+# bootstrap data, secret names, and bucket layout.
 # =============================================================================
 
 # =============================================================================
@@ -28,9 +29,8 @@ postgres:
   auth:
     database: appdb
     username: appuser
-    # Use existing secret for GitOps (sealed-secrets)
-    # Create sealed secret from configs/secrets/data-store-postgres-sealed.yaml
-    existingSecret: "data-store-postgres"
+    # Use an environment overlay to point at a concrete secret.
+    existingSecret: ""
     # Password keys in the secret
     secretKeys:
       password: password
@@ -76,7 +76,7 @@ postgres:
   
   # CNPG High Availability (when mode: cnpg)
   # Requires CNPG operator: helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace
-  # NOTE: Reduced to 2 instance for 2-node cluster - use 3+ for production HA
+  # Tune instance count per environment and cluster topology.
   cnpg:
     instances: 2
     postgresql:
@@ -95,27 +95,13 @@ postgres:
       enablePodAntiAffinity: true
       podAntiAffinityType: "preferred"
       topologyKey: "kubernetes.io/hostname"
-    # Bootstrap configuration for creating additional databases
     bootstrap:
-      initdb:
-        # Post-init SQL to create additional databases and users for app services
-        # Passwords are sourced from the sealed secrets
-        postInitApplicationSQL:
-          # Asset Service database
-          - |
-            CREATE USER asset_service WITH PASSWORD 'asset_service_password';
-            CREATE DATABASE asset_service OWNER asset_service;
-            GRANT ALL PRIVILEGES ON DATABASE asset_service TO asset_service;
-          # Payment Gateway database
-          - |
-            CREATE USER payment_gateway WITH PASSWORD 'payment_gateway_password';
-            CREATE DATABASE payment_gateway OWNER payment_gateway;
-            GRANT ALL PRIVILEGES ON DATABASE payment_gateway TO payment_gateway;
-          # Customer Registration database
-          - |
-            CREATE USER customer_reg WITH PASSWORD 'customer_reg_password';
-            CREATE DATABASE customer_registration OWNER customer_reg;
-            GRANT ALL PRIVILEGES ON DATABASE customer_registration TO customer_reg;
+      enabled: false
+      adminSecret:
+        name: db-admin-credentials
+        userKey: username
+        passwordKey: password
+      databases: []
 
 # =============================================================================
 # MinIO Configuration
@@ -130,9 +116,8 @@ minio:
   # Authentication
   auth:
     rootUser: minioadmin
-    # Use existing secret for GitOps (sealed-secrets)
-    # Create sealed secret from configs/secrets/data-store-minio-sealed.yaml
-    existingSecret: "data-store-minio"
+    # Use an environment overlay to point at a concrete secret.
+    existingSecret: ""
     # Password key in the secret
     secretKeys:
       rootPassword: root-password
@@ -143,11 +128,7 @@ minio:
     enabled: false
   
   # Buckets to create
-  buckets:
-    - name: documents
-      policy: none
-    - name: backups
-      policy: none
+  buckets: []
   
   # Resource allocation
   resources:
@@ -161,8 +142,7 @@ minio:
   # Persistence
   persistence:
     enabled: true
-    # Size reduced to 4Gi for local development with limited storage
-    # Longhorn creates 2 replicas by default, so 4Gi × 2 = 8Gi total
+    # Environment overlays can tune storage size and class.
     size: 4Gi
     storageClass: ""
   
@@ -196,7 +176,7 @@ minio:
   # Distributed High Availability (when mode: distributed)
   # MinIO distributed mode provides erasure coding and data replication
   distributed:
-    replicas: 2  # Minimum for this local test cluster (production: 4, 6, 8, 12, or 16)
+    replicas: 2  # Tune per environment and failure domain count.
     drivesPerNode: 1
     storage:
       # Reduced size for local development with limited storage

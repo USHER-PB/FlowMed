@@ -60,7 +60,7 @@ Return PostgreSQL host (for use in NOTES.txt)
 */}}
 {{- define "data-store.postgresHost" -}}
 {{- if .Values.postgres.enabled }}
-{{- printf "%s-postgres.%s.svc.cluster.local" .Release.Name (include "data-store.namespace" .) }}
+{{- printf "%s-postgres-rw.%s.svc.cluster.local" .Release.Name (include "data-store.namespace" .) }}
 {{- else if eq .Values.postgres.mode "external" }}
 {{- .Values.postgres.external.host }}
 {{- end }}

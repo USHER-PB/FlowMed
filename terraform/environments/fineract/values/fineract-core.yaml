@@ -1,0 +1,287 @@
+commonAnnotations:
+  description: Fineract Core local development deployment
+
+commonLabels:
+  deployment-type: local
+  environment: development
+
+configCli:
+  enabled: false
+  auth:
+    clientId: fineract-config
+    tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
+  bootstrapData:
+    roles: []
+    tenants: []
+    users: []
+  image:
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
+    tag: develop-032d192
+  resources:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+fineractConfig:
+  enabled: true
+  environment: prod
+  auth:
+    clientId: fineract-data-loader
+    tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
+  import:
+    checksumBehavior: continue
+    failOnError: true
+    force: false
+    managedMode: no-delete
+  image:
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
+    tag: develop-032d192
+  javaOpts: -Xmx512m -Xms256m
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+database:
+  connectionPool:
+    connectionTimeout: 30000
+    maxPoolSize: 10
+    minIdle: 2
+  host: data-store-postgres-rw.fineract.svc.cluster.local
+  port: 5432
+  tenantName: fineract_default
+  tenantStoreName: fineract_tenants
+  username: appuser
+
+databaseInit:
+  enabled: false
+  image:
+    pullPolicy: IfNotPresent
+    repository: postgres
+    tag: 15-alpine
+  postgresUser: postgres
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+fineract:
+  api:
+    password: ""
+    username: mifos
+  batch:
+    enabled: true
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
+  image:
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/adorsys-gis/fineract
+    tag: 586bd68f9
+  read:
+    autoscaling:
+      enabled: false
+    enabled: true
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
+  write:
+    autoscaling:
+      enabled: false
+    enabled: true
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+gateway:
+  dnsResolver: 10.96.0.10
+  enabled: true
+  hpa:
+    enabled: false
+  image:
+    pullPolicy: Always
+    repository: nginx
+    tag: 1.28.2-alpine
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: null
+      nginx.ingress.kubernetes.io/proxy-body-size: 50m
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    className: nginx
+    enabled: true
+    hostname: fineract.local
+    tls:
+      enabled: false
+      secretName: ""
+  port: 80
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+global:
+  domain: fineract.local
+  environment: development
+  keycloakPublicUrl: http://auth.fineract.local
+
+imagePullSecrets: []
+
+keycloakInit:
+  adminUser: admin
+  enabled: true
+  image:
+    pullPolicy: IfNotPresent
+    repository: curlimages/curl
+    tag: 8.5.0
+  realm: fineract
+  redirectUris: '["https://fineract.local/*", "http://localhost:8080/*"]'
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  url: http://keycloak.fineract.svc.cluster.local:8080
+
+oauth2Proxy:
+  cookie:
+    expire: 24h
+    samesite: lax
+    secure: false
+  enabled: true
+  externalUrl: http://fineract.local
+  hpa:
+    enabled: false
+  image:
+    pullPolicy: Always
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.15.1
+  keycloak:
+    clientId: oauth2-proxy
+    issuerUrl: http://auth.fineract.local/realms/fineract
+    jwksUrl: http://keycloak.fineract.svc.cluster.local:8080/realms/fineract/protocol/openid-connect/certs
+    realm: fineract
+    skipDiscovery: true
+    url: http://keycloak.fineract.svc.cluster.local:8080
+  oidcVerifyIssuer: false
+  port: 4180
+  redirectUrl: http://fineract.local/oauth2/callback
+  redis:
+    connectionUrl: redis://infra-cache-redis.fineract.svc.cluster.local:6379/1
+    enabled: true
+    existingSecret: infra-cache-redis-auth
+    secretKey: redis-password
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 96Mi
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+fineract:
+  image:
+    repository: ghcr.io/adorsys-gis/fineract
+    tag: 586bd68f9
+  oauth:
+    enabled: true
+    basicAuthEnabled: false
+    issuerUri: http://auth.fineract.local/realms/fineract
+    jwkSetUri: http://keycloak.fineract.svc.cluster.local:8080/realms/fineract/protocol/openid-connect/certs
+
+podSecurityContext:
+  fsGroup: 0
+  runAsGroup: 0
+  runAsNonRoot: false
+  runAsUser: 0
+
+redis:
+  database: 0
+  host: infra-cache-redis.fineract.svc.cluster.local
+  port: 6379
+
+secrets:
+  database:
+    create: false
+    password: ""
+    passwordKey: password
+    secretName: data-store-postgres
+  fineractApi:
+    oauth2ClientSecretKey: oauth2-client-secret
+    secretName: fineract-config-credentials
+  keycloak:
+    adminPasswordKey: KEYCLOAK_ADMIN_PASSWORD
+    secretName: keycloak-keycloak
+  oauth2Proxy:
+    clientSecretKey: client-secret
+    cookieSecretKey: cookieSecret
+    secretName: oauth2-proxy-secrets
+  userSync:
+    clientSecretKey: keycloak-client-secret
+    secretName: user-sync-credentials
+
+securityContext:
+  allowPrivilegeEscalation: true
+  capabilities:
+    drop: []
+  readOnlyRootFilesystem: false
+
+serviceAccount:
+  annotations: {}
+  create: true
+  name: ""
+
+userSync:
+  enabled: true
+  image:
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/adorsys-gis/fineract-apps/user-sync-service
+    tag: 169deecc
+  keycloak:
+    clientId: user-sync-service
+    realm: fineract
+    url: http://keycloak.fineract.svc.cluster.local:8080
+  port: 5000
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  syncIntervalSeconds: 300

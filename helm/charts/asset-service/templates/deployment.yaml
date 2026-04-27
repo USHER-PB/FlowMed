@@ -137,9 +137,18 @@ spec:
             - name: FINERACT_TENANT
               value: {{ .Values.config.fineract.tenant | default "default" | quote }}
             - name: FINERACT_AUTH_TYPE
-              value: "basic"
+              value: {{ .Values.config.fineract.authType | default "oauth" | quote }}
+            - name: FINERACT_TOKEN_URL
+              value: {{ .Values.config.fineract.tokenUrl | quote }}
+            - name: FINERACT_CLIENT_ID
+              value: {{ .Values.config.keycloak.clientId | quote }}
             - name: FINERACT_USERNAME
               value: {{ .Values.config.fineract.username | quote }}
+            - name: FINERACT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "asset-service.secretName" . }}
+                  key: keycloak-client-secret
             - name: FINERACT_PASSWORD
               valueFrom:
                 secretKeyRef:

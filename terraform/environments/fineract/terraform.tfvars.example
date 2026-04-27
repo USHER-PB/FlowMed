@@ -1,0 +1,10 @@
+kubeconfig_path    = "~/.kube/fineract.yaml"
+kubeconfig_context  = "fineract-admin@fineract"
+fineract_namespace  = "fineract"
+cnpg_chart_version  = "0.28.0"
+release_timeout_seconds = 1200
+
+# Optional: override the default sealed-secret manifest set.
+# sealed_secret_files = {
+#   asset_service_credentials = "/absolute/path/to/asset-service-credentials.yaml"
+# }

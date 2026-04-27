@@ -1,0 +1,90 @@
+global:
+  namespace: fineract
+  imagePullSecrets: []
+  priorityClasses:
+    enabled: false
+
+secrets:
+  mode: existing
+
+postgres:
+  namespace: fineract
+  host: data-store-postgres-rw.fineract.svc.cluster.local
+  port: 5432
+  keycloak:
+    user: keycloak
+    password: ""
+    database: keycloak
+  existingSecret: keycloak-postgres
+
+networkPolicies:
+  enabled: true
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.5.2"
+  replicas: 1
+  port: 8080
+  admin:
+    user: admin
+    password: ""
+  mode: start
+  hostnameUrl: "http://auth.fineract.local"
+  externalAppUrl: "http://fineract.local"
+  keybound:
+    enabled: true
+    version: "0.2.5"
+    realm: fineract
+    userStorageUrl: "http://user-storage:3000/kc"
+    existingSecret: "keycloak-keybound"
+    signatureVersion: "1"
+    actor: "keycloak-u-fineract"
+    nonceCacheTtl: "60"
+  ingress:
+    enabled: true
+    blockAdminUI: false
+    className: nginx
+    host: "auth.fineract.local"
+    tls:
+      enabled: false
+  resources:
+    requests:
+      memory: "384Mi"
+      cpu: "250m"
+    limits:
+      memory: "768Mi"
+      cpu: "1"
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPU: 70
+  pdb:
+    enabled: false
+  existingSecret: "keycloak-keycloak"
+
+keycloakConfig:
+  enabled: true
+  environment: dev
+  verifyEmail: true
+  sslRequired: "none"
+  accessTokenLifespan: 1800
+  smtp:
+    host: "mailpit"
+    port: "1025"
+    from: "noreply@webank.dev"
+    fromDisplayName: "Webank"
+    replyTo: "support@webank.dev"
+    replyToDisplayName: "Webank Support"
+    ssl: "false"
+    starttls: "false"
+    auth: "false"
+  realmUsers:
+    adminPassword: ""
+    mifosPassword: ""
+    kycAdminPassword: ""
+  image:
+    repository: adorsys/keycloak-config-cli
+    tag: "6.5.0-26.5.4"

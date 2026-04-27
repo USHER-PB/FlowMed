@@ -12,7 +12,8 @@ This chart deploys the complete Fineract core banking infrastructure as part of 
 - **NGINX Gateway** - Routes traffic to appropriate instances
 - **OAuth2-Proxy** - Validates OIDC tokens from Keycloak
 - **User Sync Service** - Synchronizes users between Keycloak and Fineract
-- **Config CLI Job** - Bootstraps initial configuration
+ - **Config CLI Job** - Bootstraps initial tenants/users/roles
+ - **Fineract Config Import Job** - Seeds GL accounts, payment types, and savings products
 
 ## Prerequisites
 
@@ -157,6 +158,8 @@ helm upgrade --install fineract-core ./helm/charts/fineract-core \
 | `configCli.enabled` | Enable config CLI job | `true` |
 | `configCli.bootstrapData.tenants` | Initial tenant data | `[]` |
 | `configCli.bootstrapData.users` | Initial user data | `[]` |
+| `fineractConfig.enabled` | Enable Fineract config import job | `false` |
+| `fineractConfig.environment` | Config file set to import (`prod`/`dev`) | `prod` |
 
 ## Secrets Management
 
