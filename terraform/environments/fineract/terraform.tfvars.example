@@ -1,10 +1,55 @@
-kubeconfig_path    = "~/.kube/fineract.yaml"
-kubeconfig_context  = "fineract-admin@fineract"
-fineract_namespace  = "fineract"
-cnpg_chart_version  = "0.28.0"
-release_timeout_seconds = 1200
+kubeconfig_path    = "~/.kube/fineract-k3s.yaml"
+kubeconfig_context = "fineract-admin@fineract"
 
-# Optional: override the default sealed-secret manifest set.
-# sealed_secret_files = {
-#   asset_service_credentials = "/absolute/path/to/asset-service-credentials.yaml"
-# }
+# Public URL model
+url_scheme         = "http"
+realm_name         = "fineract"
+ingress_class_name = "nginx"
+storage_class_name = "longhorn"
+
+hostnames = {
+  platform = "fineract.local"
+  api      = "api.fineract.local"
+  auth     = "auth.fineract.local"
+  bff      = "bff.fineract.local"
+  kyc      = "kyc.fineract.local"
+  mobile   = "mobile.fineract.local"
+}
+
+# Secret strategies:
+# - "sealed": every managed secret must be provided as a SealedSecret file
+# - "hybrid": prefer SealedSecrets, generate only missing secrets
+# - "generated": ignore SealedSecret files and generate every managed secret
+secret_mode = "hybrid"
+
+generated_secret_literals = {
+  ghcr_credentials = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "ghcr.io" = {
+          auth = "BASE64_USER_COLON_TOKEN"
+        }
+      }
+    })
+  }
+}
+
+# Optional when ingress_nginx is disabled but KYC public issuer access stays on.
+public_issuer_access_ip = ""
+
+release_toggles = {
+  sealed_secrets = true
+  metallb        = true
+  longhorn       = true
+  ingress_nginx  = true
+}
+
+service_toggles = {
+  "data_store.minio"                       = true
+  "data_store.postgres"                    = true
+  "fineract_core.batch"                    = true
+  "fineract_app_services.sms_gateway"      = true
+  "fineract_ui_stack.self_service"         = false
+  "fineract_ui_stack.web_app"              = false
+  "azamra_edge.kyc_public_issuer_access"   = true
+}

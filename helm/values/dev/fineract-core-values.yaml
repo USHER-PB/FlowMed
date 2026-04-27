@@ -230,7 +230,7 @@ configCli:
   enabled: true
   image:
     repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
-    tag: "develop-032d192"
+    tag: "develop-9550021"
     pullPolicy: IfNotPresent
   resources:
     requests:

@@ -3,6 +3,12 @@ variable "name" {
   type        = string
 }
 
+variable "enabled" {
+  description = "Whether to manage this Helm release"
+  type        = bool
+  default     = true
+}
+
 variable "namespace" {
   description = "Target namespace for the release"
   type        = string

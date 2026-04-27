@@ -21,7 +21,7 @@ metadata:
     {{- toYaml .Values.cashier.ingress.annotations | nindent 4 }}
     {{- end }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.cashier.ingress.className | default "nginx" }}
   {{- if .Values.cashier.tls.enabled }}
   tls:
     - hosts:

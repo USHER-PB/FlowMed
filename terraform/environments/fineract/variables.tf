@@ -1,7 +1,7 @@
 variable "kubeconfig_path" {
   description = "Path to the kubeconfig file used by Terraform"
   type        = string
-  default     = "~/.kube/fineract.yaml"
+  default     = "~/.kube/fineract-k3s.yaml"
 }
 
 variable "kubeconfig_context" {

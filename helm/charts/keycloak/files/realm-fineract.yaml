@@ -258,6 +258,34 @@ clients:
     standardFlowEnabled: false
     implicitFlowEnabled: false
     directAccessGrantsEnabled: false
+    serviceAccountsEnabled: true
+    defaultClientScopes:
+      - profile
+      - email
+      - roles
+    protocolMappers:
+      - name: tenant-mapper
+        protocol: openid-connect
+        protocolMapper: oidc-hardcoded-claim-mapper
+        consentRequired: false
+        config:
+          userinfo.token.claim: "true"
+          id.token.claim: "true"
+          access.token.claim: "true"
+          claim.name: "tenant"
+          claim.value: "default"
+          jsonType.label: "String"
+      - name: mifos-sub-mapper
+        protocol: openid-connect
+        protocolMapper: oidc-hardcoded-claim-mapper
+        consentRequired: false
+        config:
+          userinfo.token.claim: "true"
+          id.token.claim: "true"
+          access.token.claim: "true"
+          claim.name: "sub"
+          claim.value: "mifos"
+          jsonType.label: "String"
 
   # 3. Resource Server Placeholder
   - clientId: resource-server
@@ -586,16 +614,20 @@ clients:
     redirectUris:
       {{- if eq (.Values.keycloakConfig.environment | default "dev") "dev" }}
       - "http://localhost:3000/*"
+      - "http://localhost:3000/api/auth/callback"
       - "http://localhost:3000/api/auth/callback/keycloak"
       - "http://localhost:8080/kyc-manager/*"
+      - "http://localhost:8080/kyc-manager/api/auth/callback"
       - "http://localhost:8080/kyc-manager/api/auth/callback/keycloak"
       {{- end }}
       {{- if .Values.keycloak.externalKycUrl }}
       - "{{ .Values.keycloak.externalKycUrl }}/*"
+      - "{{ .Values.keycloak.externalKycUrl }}/api/auth/callback"
       - "{{ .Values.keycloak.externalKycUrl }}/api/auth/callback/keycloak"
       {{- end }}
       {{- if .Values.keycloak.externalAppUrl }}
       - "{{ .Values.keycloak.externalAppUrl }}/kyc-manager/*"
+      - "{{ .Values.keycloak.externalAppUrl }}/kyc-manager/api/auth/callback"
       - "{{ .Values.keycloak.externalAppUrl }}/kyc-manager/api/auth/callback/keycloak"
       {{- end }}
     webOrigins:

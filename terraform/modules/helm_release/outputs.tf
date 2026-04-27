@@ -1,19 +1,24 @@
 output "name" {
   description = "Helm release name"
-  value       = helm_release.this.name
+  value       = var.name
+}
+
+output "enabled" {
+  description = "Whether the Helm release is managed"
+  value       = var.enabled
 }
 
 output "namespace" {
   description = "Helm release namespace"
-  value       = helm_release.this.namespace
+  value       = var.namespace
 }
 
 output "chart" {
   description = "Helm chart"
-  value       = helm_release.this.chart
+  value       = var.chart
 }
 
 output "chart_version" {
   description = "Helm chart version"
-  value       = helm_release.this.version
+  value       = var.chart_version
 }

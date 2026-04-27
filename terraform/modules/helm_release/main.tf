@@ -1,4 +1,5 @@
 resource "helm_release" "this" {
+  count             = var.enabled ? 1 : 0
   name              = var.name
   namespace         = var.namespace
   create_namespace  = var.create_namespace

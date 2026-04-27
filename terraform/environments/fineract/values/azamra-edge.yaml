@@ -1,9 +1,17 @@
 azamraKycManager:
+  apiUrl: "http://user-storage:3000/staff"
   publicIssuerAccess:
     enabled: true
-    ip: 10.107.200.204
     port: 80
+  redis:
+    host: infra-cache-redis-master
 
 userStorage:
   initDatabase:
     enabled: false
+  redis:
+    host: infra-cache-redis-master
+
+azamraBff:
+  redis:
+    host: infra-cache-redis-master

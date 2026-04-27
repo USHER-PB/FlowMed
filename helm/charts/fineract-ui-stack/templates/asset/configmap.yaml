@@ -15,5 +15,5 @@ metadata:
     {{- include "fineract-ui-stack.appLabels" (dict "root" . "appName" "asset") | nindent 4 }}
 data:
   default.conf: |
-{{ .Files.Get "files/frontend-default.conf" | indent 4 }}
+{{ .Files.Get "files/asset-manager-default.conf" | replace "KUBE_DNS_RESOLVER" (.Values.global.dnsResolver | default "10.96.0.10") | indent 4 }}
 {{- end }}

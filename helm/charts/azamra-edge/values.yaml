@@ -57,7 +57,7 @@ azamraBff:
   kyc:
     whatsappLink: "https://wa.link/jprtzd"
   redis:
-    host: infra-cache-redis
+    host: infra-cache-redis-master
     port: "6379"
     password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
     existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
@@ -81,6 +81,7 @@ azamraKycManager:
   replicas: 1
   existingSecret: "kyc-manager-credentials"  # SealedSecret for KYC Manager
   nextAuthUrl: "http://kyc.fineract.local"
+  nextAuthSecret: ""
   oauth2:
     issuer: ""  # Leave empty to use global keycloakPublicUrl + realm
     internalIssuer: ""  # Optional: only set when the internal discovery document advertises the same issuer as the public one
@@ -104,7 +105,7 @@ azamraKycManager:
       enabled: false
       secretName: ""
   redis:
-    host: infra-cache-redis
+    host: infra-cache-redis-master
     port: "6379"
     password: ""  # REQUIRED: Set Redis password for dev, or use existingSecret for K8s
     existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
@@ -133,6 +134,8 @@ userStorage:
     url: ""  # Not used when existingSecret is set
     poolSize: 15
   redis:
+    host: infra-cache-redis-master
+    port: "6379"
     url: ""  # Not used when existingSecret is set
     existingSecret: "infra-cache-redis-auth"  # Redis auth secret from infra-cache
   minio:

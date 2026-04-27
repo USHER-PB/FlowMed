@@ -1,0 +1,17 @@
+ingress:
+  enabled: true
+  className: nginx
+  host: mobile.fineract.local
+  tls:
+    enabled: false
+
+config:
+  backendUrl: http://bff.fineract.local
+  powDifficulty: "5"
+  otlpEndpoint: http://otel-collector:4318
+  keycloak:
+    realm: fineract
+    kcUrl: http://auth.fineract.local
+    issuer: http://auth.fineract.local/realms/fineract
+    clientId: web-mobile
+    scheme: http

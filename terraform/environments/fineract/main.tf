@@ -1,4 +1,4 @@
-terraform {
+ terraform {
   required_version = ">= 1.6.0"
 
   required_providers {
@@ -83,6 +83,8 @@ locals {
   oauth2_proxy_secret_checksum = filesha256("${local.repo_root}/configs/secrets/oauth2-proxy-secrets.yaml")
   keycloak_realm_checksum      = filesha256("${local.repo_root}/helm/charts/keycloak/files/realm-fineract.yaml")
   fineract_config_checksum     = filesha256("${local.repo_root}/helm/charts/fineract-core/files/config/prod/base-config.yml")
+  gateway_config_checksum      = filesha256("${local.repo_root}/helm/charts/fineract-core/files/nginx/gateway.conf")
+  asset_manager_nginx_checksum = filesha256("${local.repo_root}/helm/charts/fineract-ui-stack/files/asset-manager-default.conf")
   asset_service_checksum = sha256(join("", [
     filesha256("${local.repo_root}/helm/charts/asset-service/templates/deployment.yaml"),
     filesha256("${local.repo_root}/helm/charts/asset-service/values.yaml"),
@@ -99,6 +101,15 @@ provider "helm" {
     config_path    = var.kubeconfig_path != "" ? pathexpand(var.kubeconfig_path) : null
     config_context = var.kubeconfig_context != "" ? var.kubeconfig_context : null
   }
+}
+
+data "kubernetes_service" "ingress_nginx_controller" {
+  metadata {
+    name      = "ingress-nginx-controller"
+    namespace = "ingress-nginx"
+  }
+
+  depends_on = [module.ingress_nginx]
 }
 
 resource "kubernetes_namespace" "fineract" {
@@ -293,6 +304,9 @@ module "fineract_core" {
   ]
   extra_values = [
     yamlencode({
+      commonAnnotations = {
+        "checksum/gateway-config" = local.gateway_config_checksum
+      }
       oauth2Proxy = {
         annotations = {
           "checksum/oauth2-proxy-sealed-secret" = local.oauth2_proxy_secret_checksum
@@ -367,7 +381,8 @@ module "fineract_ui_stack" {
   extra_values = [
     yamlencode({
       bootstrapChecksums = {
-        sealedSecrets = local.sealed_secret_bundle_checksum
+        sealedSecrets     = local.sealed_secret_bundle_checksum
+        assetManagerNginx = local.asset_manager_nginx_checksum
       }
     })
   ]
@@ -396,6 +411,13 @@ module "azamra_edge" {
       bootstrapChecksums = {
         sealedSecrets = local.sealed_secret_bundle_checksum
       }
+      azamraKycManager = {
+        publicIssuerAccess = {
+          enabled = true
+          ip      = data.kubernetes_service.ingress_nginx_controller.spec[0].cluster_ip
+          port    = 80
+        }
+      }
     })
   ]
   timeout_seconds = var.release_timeout_seconds
@@ -407,6 +429,26 @@ module "azamra_edge" {
     module.keycloak,
     module.fineract_core,
     module.fineract_app_services,
+    module.ingress_nginx,
+    terraform_data.sealed_secret_apply,
+  ]
+}
+
+module "azamra_ui" {
+  source = "../../modules/helm_release"
+
+  name      = "azamra-ui"
+  namespace = var.fineract_namespace
+  chart     = "${local.charts_dir}/azamra-ui"
+  values_files = [
+    "${local.charts_dir}/azamra-ui/values.yaml",
+    "${local.values_dir}/azamra-ui.yaml",
+  ]
+  timeout_seconds = var.release_timeout_seconds
+  depends_on = [
+    kubernetes_namespace.fineract,
+    module.sealed_secrets,
+    module.azamra_edge,
     module.ingress_nginx,
     terraform_data.sealed_secret_apply,
   ]

@@ -22,6 +22,8 @@ spec:
       {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "asset") | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/nginx-config: {{ .Files.Get "files/asset-manager-default.conf" | sha256sum }}
       labels:
         {{- include "fineract-ui-stack.appSelectorLabels" (dict "root" . "appName" "asset") | nindent 8 }}
     spec:

@@ -1,0 +1,25 @@
+{{- if .Values.masterService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.masterService.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-redis
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: redis
+    statefulset.kubernetes.io/pod-name: {{ .Values.masterService.targetPodName }}
+{{- end }}

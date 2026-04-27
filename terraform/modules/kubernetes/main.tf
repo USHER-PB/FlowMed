@@ -60,7 +60,7 @@ resource "aws_eks_cluster" "main" {
     resources = ["secrets"]
   }
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, {cd en 
     Name = var.cluster_name
   })
 

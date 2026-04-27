@@ -81,6 +81,17 @@ spec:
             - name: NEXTAUTH_URL
               value: {{ .Values.azamraKycManager.nextAuthUrl | quote }}
             {{- end }}
+            {{- if .Values.azamraKycManager.nextAuthSecret }}
+            - name: NEXTAUTH_SECRET
+              value: {{ .Values.azamraKycManager.nextAuthSecret | quote }}
+            {{- else if .Values.azamraKycManager.existingSecret }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.azamraKycManager.existingSecret }}
+                  key: NEXTAUTH_SECRET
+                  optional: true
+            {{- end }}
             {{- if .Values.azamraKycManager.redis.existingSecret }}
             - name: REDIS_PASSWORD
               valueFrom:

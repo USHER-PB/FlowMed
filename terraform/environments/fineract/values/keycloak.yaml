@@ -33,6 +33,7 @@ keycloak:
   mode: start
   hostnameUrl: "http://auth.fineract.local"
   externalAppUrl: "http://fineract.local"
+  externalKycUrl: "http://kyc.fineract.local"
   keybound:
     enabled: true
     version: "0.2.5"

@@ -40,7 +40,7 @@ spec:
               cpu: "10m"
         - name: wait-for-redis
           image: busybox:1.36
-          command: ['sh', '-c', 'until nc -z infra-cache-redis 6379; do echo waiting for redis; sleep 2; done']
+          command: ['sh', '-c', 'until nc -z {{ .Values.userStorage.redis.host }} {{ .Values.userStorage.redis.port }}; do echo waiting for redis; sleep 2; done']
           securityContext:
             runAsUser: 65534
             runAsNonRoot: true
@@ -58,7 +58,9 @@ spec:
             - sh
             - -c
             - |
-              redis-cli -h infra-cache-redis -p 6379 DEL backend:worker:consumer-lock
+              # user-storage relies on a writable Redis endpoint for work queue coordination
+              # and lock cleanup during startup.
+              redis-cli -h {{ .Values.userStorage.redis.host }} -p {{ .Values.userStorage.redis.port }} DEL backend:worker:consumer-lock
               echo "Redis worker lock cleared"
           securityContext:
             runAsUser: 65534
@@ -113,7 +115,7 @@ spec:
                   name: {{ .Values.userStorage.redis.existingSecret }}
                   key: redis-password
             - name: REDIS_URL
-              value: "redis://:$(REDIS_PASSWORD)@infra-cache-redis:6379"
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.userStorage.redis.host }}:{{ .Values.userStorage.redis.port }}"
             {{- else }}
             - name: REDIS_URL
               value: {{ .Values.userStorage.redis.url | quote }}

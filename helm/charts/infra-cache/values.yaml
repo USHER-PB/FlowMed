@@ -55,6 +55,11 @@ redis:
   metrics:
     enabled: false
 
+masterService:
+  enabled: true
+  name: "infra-cache-redis-master"
+  targetPodName: "infra-cache-redis-node-0"
+
 
 # ==============================================================================
 # Prometheus Redis Exporter

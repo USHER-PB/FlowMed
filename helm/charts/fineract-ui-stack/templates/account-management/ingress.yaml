@@ -21,7 +21,7 @@ metadata:
     {{- toYaml .Values.accountManagement.ingress.annotations | nindent 4 }}
     {{- end }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.accountManagement.ingress.className | default "nginx" }}
   {{- if .Values.accountManagement.tls.enabled }}
   tls:
     - hosts:

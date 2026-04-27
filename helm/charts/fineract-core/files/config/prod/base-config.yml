@@ -714,6 +714,31 @@ offices:
     externalId: "1"
     openingDate: "2009-01-01"
 
+# Infrastructure clients required by the asset-service savings accounts below.
+clients:
+  - fullname: Platform Fee Collector
+    officeName: Head Office
+    active: true
+    externalId: PLATFORM-CLIENT
+    activationDate:
+      - 2024
+      - 3
+      - 1
+    clientType: Corporate
+    clientClassification: Active
+    legalFormId: 2
+  - fullname: DGI Tax Authority
+    officeName: Head Office
+    active: true
+    externalId: TAX-AUTHORITY
+    activationDate:
+      - 2024
+      - 3
+      - 1
+    clientType: Corporate
+    clientClassification: Active
+    legalFormId: 2
+
 savingsAccounts:
 - clientExternalId: PLATFORM-CLIENT
   productShortName: PFEE

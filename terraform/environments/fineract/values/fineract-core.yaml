@@ -17,7 +17,7 @@ configCli:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
-    tag: develop-032d192
+    tag: develop-9550021
   resources:
     limits:
       cpu: 200m
@@ -33,14 +33,14 @@ fineractConfig:
     clientId: fineract-data-loader
     tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
   import:
-    checksumBehavior: continue
+    checksumBehavior: force
     failOnError: true
-    force: false
+    force: true
     managedMode: no-delete
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
-    tag: develop-032d192
+    tag: develop-9550021
   javaOpts: -Xmx512m -Xms256m
   resources:
     limits:

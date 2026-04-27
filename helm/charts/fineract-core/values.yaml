@@ -245,7 +245,7 @@ fineractConfig:
   environment: prod
   image:
     repository: ghcr.io/adorsys-gis/fineract/fineract-config-cli
-    tag: "develop-032d192"
+    tag: "develop-9550021"
     pullPolicy: IfNotPresent
   auth:
     tokenUrl: http://keycloak:8080/realms/fineract/protocol/openid-connect/token
