@@ -129,6 +129,7 @@ model MedicalCenter {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name               String
+  city               String             @default("")
   address            String
   phone              String
   verificationStatus VerificationStatus @default(PENDING)
@@ -139,6 +140,8 @@ model MedicalCenter {
 
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+
+  @@index([city])
 }
 
 model Availability {

@@ -55,6 +55,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
             <Link href={`/${locale}/providers`} className="text-gray-600 hover:text-teal-700">
               Find Provider
             </Link>
+            <Link href={`/${locale}/medical-centers`} className="text-gray-600 hover:text-teal-700">
+              Medical Centers
+            </Link>
             <Link href={`/${locale}/history`} className="text-gray-600 hover:text-teal-700">
               History
             </Link>

@@ -60,6 +60,19 @@
     "next": "Suivant",
     "previous": "Précédent"
   },
+  "medicalCenters": {
+    "title": "Centres Médicaux",
+    "subtitle": "Parcourez les établissements de santé vérifiés au Cameroun",
+    "searchPlaceholder": "Rechercher par nom ou adresse...",
+    "filterByCity": "Filtrer par ville",
+    "allCities": "Toutes les villes",
+    "providers": "prestataires",
+    "noResults": "Aucun centre médical trouvé. Essayez d'ajuster vos filtres.",
+    "viewCenter": "Voir le centre",
+    "backToList": "← Retour aux centres médicaux",
+    "affiliatedProviders": "Prestataires dans ce centre",
+    "noProviders": "Aucun prestataire vérifié dans ce centre pour l'instant."
+  },
   "contact": {
     "title": "Contactez-nous",
     "subtitle": "Nous sommes là pour vous aider",

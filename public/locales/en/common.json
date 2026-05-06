@@ -60,6 +60,19 @@
     "next": "Next",
     "previous": "Previous"
   },
+  "medicalCenters": {
+    "title": "Medical Centers",
+    "subtitle": "Browse verified healthcare facilities in Cameroon",
+    "searchPlaceholder": "Search by name or address...",
+    "filterByCity": "Filter by city",
+    "allCities": "All Cities",
+    "providers": "providers",
+    "noResults": "No medical centers found. Try adjusting your filters.",
+    "viewCenter": "View Center",
+    "backToList": "← Back to Medical Centers",
+    "affiliatedProviders": "Providers at this center",
+    "noProviders": "No verified providers at this center yet."
+  },
   "contact": {
     "title": "Contact Us",
     "subtitle": "We're here to help you",

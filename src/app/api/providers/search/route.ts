@@ -146,6 +146,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true,
               name: true,
+              city: true,
               address: true,
             },
           },
