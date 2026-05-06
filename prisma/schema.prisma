@@ -91,6 +91,7 @@ model Provider {
   lastName            String
   specialty           String?
   licenseNumber       String?
+  licenseExpiryDate   DateTime?
   verificationStatus  VerificationStatus @default(PENDING)
   verificationDocs    String?            @db.Text
 
