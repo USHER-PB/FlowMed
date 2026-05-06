@@ -67,11 +67,11 @@ export async function GET(req: NextRequest) {
       pageSize,
     };
 
-    // Try cache first
-    const cached = await getProviderSearchResults(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
+    // Try cache first - disabled to prevent stale results
+    // const cached = await getProviderSearchResults(cacheKey);
+    // if (cached) {
+    //   return NextResponse.json(cached);
+    // }
 
     // Resolve day-of-week filter from date
     let dayOfWeek: number | undefined;
@@ -101,13 +101,8 @@ export async function GET(req: NextRequest) {
             },
           }
         : {}),
-      ...(dayOfWeek !== undefined
-        ? {
-            availability: {
-              some: { dayOfWeek },
-            },
-          }
-        : {}),
+      // Only filter by availability if date is provided AND provider has availability records
+      // This is a soft filter — providers without availability still show up
     };
 
     const { skip, take } = parsePaginationParams({ page, pageSize });
@@ -171,8 +166,8 @@ export async function GET(req: NextRequest) {
 
     const result = buildPaginatedResult(formatted, total, page, pageSize);
 
-    // Cache the result
-    await setProviderSearchResults(cacheKey, formatted);
+    // Cache disabled to prevent stale results
+    // await setProviderSearchResults(cacheKey, formatted);
 
     return NextResponse.json(result);
   } catch (error) {

@@ -149,36 +149,64 @@ export default function DashboardPage() {
             {appointments.map((appt) => (
               <div
                 key={appt.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 flex items-center justify-between"
+                className="rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow"
               >
-                <div>
-                  <div className="font-medium text-gray-900">
-                    Dr. {appt.provider.firstName} {appt.provider.lastName}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 text-base">
+                      Dr. {appt.provider.firstName} {appt.provider.lastName}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-0.5">
+                      {TIER_LABELS[appt.provider.tier] ?? appt.provider.tier}
+                      {appt.provider.specialty ? ` · ${appt.provider.specialty}` : ""}
+                    </div>
+                    
+                    {/* Date and Time Display - More Prominent */}
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 px-3 py-1.5 rounded-md">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm font-medium">
+                          {new Date(appt.dateTime).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-teal-700 bg-teal-50 px-3 py-1.5 rounded-md">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium">
+                          {new Date(appt.dateTime).toLocaleTimeString(locale === 'fr' ? 'fr-FR' : 'en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {TIER_LABELS[appt.provider.tier] ?? appt.provider.tier}
-                    {appt.provider.specialty ? ` · ${appt.provider.specialty}` : ""}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {new Date(appt.dateTime).toLocaleString()}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      STATUS_COLORS[appt.status] ?? "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {appt.status.replace(/_/g, " ")}
-                  </span>
-                  {appt.queueItem && appt.status === "IN_PROGRESS" && (
-                    <Link
-                      href={`/queue/${appt.id}`}
-                      className="text-xs text-blue-600 hover:underline"
+                  
+                  <div className="flex flex-col items-end gap-2">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${
+                        STATUS_COLORS[appt.status] ?? "bg-gray-100 text-gray-700"
+                      }`}
                     >
-                      View queue →
-                    </Link>
-                  )}
+                      {appt.status.replace(/_/g, " ")}
+                    </span>
+                    {appt.queueItem && appt.status === "IN_PROGRESS" && (
+                      <Link
+                        href={`/queue/${appt.id}`}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        View queue →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateLicenseFormat } from "./license";
 
 // ---------------------------------------------------------------------------
 // Base schemas
@@ -79,19 +80,40 @@ const providerBaseSchema = z.object({
 export const tier1RegisterSchema = providerBaseSchema.extend({
   tier: z.literal("TIER_1_DOCTOR"),
   specialty: z.string().min(1, "Specialty is required for doctors"),
-  licenseNumber: z.string().min(1, "License number is required for doctors"),
+  licenseNumber: z.string().min(1, "License number is required for doctors").refine(
+    (val) => validateLicenseFormat(val, 'TIER_1_DOCTOR').isValid,
+    (val) => ({ message: validateLicenseFormat(val, 'TIER_1_DOCTOR').error || 'Invalid license format. Expected: 8794/2018 or P12858/2022' })
+  ),
+  licenseExpiryDate: z.string().optional().refine(
+    (val) => !val || new Date(val) > new Date(),
+    "License expiration date must be in the future"
+  ),
 });
 
 export const tier2RegisterSchema = providerBaseSchema.extend({
   tier: z.literal("TIER_2_NURSE"),
-  licenseNumber: z.string().min(1, "License number is required for nurses"),
+  licenseNumber: z.string().min(1, "License number is required for nurses").refine(
+    (val) => validateLicenseFormat(val, 'TIER_2_NURSE').isValid,
+    (val) => ({ message: validateLicenseFormat(val, 'TIER_2_NURSE').error || 'Invalid license format' })
+  ),
+  licenseExpiryDate: z.string().optional().refine(
+    (val) => !val || new Date(val) > new Date(),
+    "License expiration date must be in the future"
+  ),
   specialty: z.string().optional(),
 });
 
 export const tier3RegisterSchema = providerBaseSchema.extend({
   tier: z.literal("TIER_3_CERTIFIED_WORKER"),
   specialty: z.string().optional(),
-  licenseNumber: z.string().optional(), // graduation certificate reference
+  licenseNumber: z.string().optional().refine(
+    (val) => !val || validateLicenseFormat(val, 'TIER_3_CERTIFIED_WORKER').isValid,
+    (val) => ({ message: val ? (validateLicenseFormat(val, 'TIER_3_CERTIFIED_WORKER').error || 'Invalid license format') : '' })
+  ),
+  licenseExpiryDate: z.string().optional().refine(
+    (val) => !val || new Date(val) > new Date(),
+    "License expiration date must be in the future"
+  ),
 });
 
 export const tier4RegisterSchema = providerBaseSchema.extend({

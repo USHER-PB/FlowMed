@@ -1,9 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/nextauth-options";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/middleware";
 import { createAppointmentSchema } from "@/lib/validations/appointment";
 import { bookAppointmentAtomically } from "@/lib/db/transactions";
 import { publish } from "@/lib/pubsub";
+
+/**
+ * Helper: get authenticated user ID + role from either JWT cookie or NextAuth session
+ */
+async function getAuthUser(req: NextRequest): Promise<{ userId: string; role: string } | null> {
+  // Try JWT cookie first
+  const auth = requireRole(req, ["PATIENT", "PROVIDER"]);
+  if (!auth.error) return { userId: auth.user.userId, role: auth.user.role };
+
+  // Fall back to NextAuth session
+  try {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, role: true },
+      });
+      if (user && (user.role === "PATIENT" || user.role === "PROVIDER")) {
+        return { userId: user.id, role: user.role };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 /**
  * POST /api/appointments
@@ -16,8 +44,10 @@ import { publish } from "@/lib/pubsub";
  * - Publishes appointment_status event via pub/sub
  */
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["PATIENT"]);
-  if (auth.error) return auth.error;
+  const authUser = await getAuthUser(req);
+  if (!authUser || authUser.role !== "PATIENT") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const body = await req.json();
@@ -33,9 +63,17 @@ export async function POST(req: NextRequest) {
     const { providerId, dateTime: dateTimeStr } = parsed.data;
     const dateTime = new Date(dateTimeStr);
 
+    // Validate appointment is not in the past
+    if (dateTime < new Date()) {
+      return NextResponse.json(
+        { error: "Cannot book an appointment in the past" },
+        { status: 400 }
+      );
+    }
+
     // Fetch patient profile
     const patient = await prisma.patient.findUnique({
-      where: { userId: auth.user.userId },
+      where: { userId: authUser.userId },
       select: { id: true },
     });
 
@@ -155,8 +193,10 @@ export async function POST(req: NextRequest) {
  * - PROVIDER: returns their appointments as a provider
  */
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["PATIENT", "PROVIDER"]);
-  if (auth.error) return auth.error;
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const { searchParams } = new URL(req.url);
@@ -165,9 +205,9 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)));
     const skip = (page - 1) * pageSize;
 
-    if (auth.user.role === "PATIENT") {
+    if (authUser.role === "PATIENT") {
       const patient = await prisma.patient.findUnique({
-        where: { userId: auth.user.userId },
+        where: { userId: authUser.userId },
         select: { id: true },
       });
 
@@ -213,7 +253,7 @@ export async function GET(req: NextRequest) {
 
     // PROVIDER
     const provider = await prisma.provider.findUnique({
-      where: { userId: auth.user.userId },
+      where: { userId: authUser.userId },
       select: { id: true },
     });
 

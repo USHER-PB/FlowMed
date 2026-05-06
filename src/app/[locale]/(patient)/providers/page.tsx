@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import DatePicker from "@/components/ui/DatePicker";
 
 interface Provider {
   id: string;
@@ -24,6 +25,91 @@ const TIER_OPTIONS = [
   { value: "TIER_5_VOLUNTEER", label: "Health Volunteer (Tier 5)" },
 ];
 
+// Specialties filtered by tier — same as registration page
+const SPECIALTY_BY_TIER: Record<string, string[]> = {
+  TIER_1_DOCTOR: [
+    "General Practice / Médecine Générale",
+    "Family Medicine / Médecine de Famille",
+    "Internal Medicine / Médecine Interne",
+    "Emergency Medicine / Médecine d'Urgence",
+    "Cardiology / Cardiologie",
+    "Dermatology / Dermatologie",
+    "Endocrinology / Endocrinologie",
+    "Gastroenterology / Gastroentérologie",
+    "Hematology / Hématologie",
+    "Infectious Disease / Maladies Infectieuses",
+    "Nephrology / Néphrologie",
+    "Neurology / Neurologie",
+    "Oncology / Oncologie",
+    "Pulmonology / Pneumologie",
+    "Rheumatology / Rhumatologie",
+    "General Surgery / Chirurgie Générale",
+    "Orthopedic Surgery / Chirurgie Orthopédique",
+    "Neurosurgery / Neurochirurgie",
+    "Cardiovascular Surgery / Chirurgie Cardiovasculaire",
+    "Plastic Surgery / Chirurgie Plastique",
+    "Gynecology / Gynécologie",
+    "Obstetrics / Obstétrique",
+    "Pediatrics / Pédiatrie",
+    "Neonatology / Néonatologie",
+    "Ophthalmology / Ophtalmologie",
+    "Otolaryngology (ENT) / ORL",
+    "Psychiatry / Psychiatrie",
+    "Radiology / Radiologie",
+    "Pathology / Anatomopathologie",
+    "Anesthesiology / Anesthésiologie",
+    "Laboratory Medicine / Médecine de Laboratoire",
+  ],
+  TIER_2_NURSE: [
+    "General Nursing / Soins Infirmiers Généraux",
+    "Community Health Nursing / Santé Communautaire",
+    "Home Care Nursing / Soins à Domicile",
+    "Pediatric Nursing / Soins Infirmiers Pédiatriques",
+    "Surgical Nursing / Soins Infirmiers Chirurgicaux",
+    "Intensive Care Nursing / Soins Intensifs",
+    "Oncology Nursing / Soins Infirmiers en Oncologie",
+    "Psychiatric Nursing / Soins Infirmiers Psychiatriques",
+    "Geriatric Nursing / Soins Infirmiers Gériatriques",
+    "Emergency Nursing / Soins Infirmiers d'Urgence",
+    "Midwifery / Sage-Femme",
+    "Obstetric Nursing / Soins Infirmiers Obstétricaux",
+    "Neonatal Nursing / Soins Infirmiers Néonataux",
+  ],
+  TIER_3_CERTIFIED_WORKER: [
+    "Physiotherapy / Kinésithérapie",
+    "Pharmacy / Pharmacie",
+    "Nutrition & Dietetics / Nutrition & Diététique",
+    "Medical Laboratory / Laboratoire Médical",
+    "Dental Hygiene / Hygiène Dentaire",
+    "Optometry / Optométrie",
+    "Radiology Technology / Technologie Radiologique",
+    "Medical Imaging / Imagerie Médicale",
+    "Community Health Worker / Agent de Santé Communautaire",
+    "Health Promotion / Promotion de la Santé",
+    "Environmental Health / Santé Environnementale",
+    "Occupational Therapy / Ergothérapie",
+    "Speech Therapy / Orthophonie",
+    "Prosthetics & Orthotics / Prothèses & Orthèses",
+  ],
+  TIER_4_STUDENT: [
+    "Medicine / Médecine",
+    "Surgery / Chirurgie",
+    "Pediatrics / Pédiatrie",
+    "Gynecology-Obstetrics / Gynécologie-Obstétrique",
+    "Internal Medicine / Médecine Interne",
+    "General Nursing / Soins Infirmiers",
+    "Midwifery / Sage-Femme",
+    "Pediatric Nursing / Soins Infirmiers Pédiatriques",
+  ],
+  TIER_5_VOLUNTEER: [
+    "First Aid / Premiers Secours",
+    "Health Education / Éducation Sanitaire",
+    "Community Support / Soutien Communautaire",
+    "Mental Health Support / Soutien en Santé Mentale",
+    "Elderly Care / Soins aux Personnes Âgées",
+  ],
+};
+
 const TIER_BADGE_COLORS: Record<string, string> = {
   TIER_1_DOCTOR: "bg-blue-100 text-blue-800",
   TIER_2_NURSE: "bg-teal-100 text-teal-800",
@@ -44,6 +130,15 @@ export default function ProvidersPage() {
   const [tier, setTier] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [date, setDate] = useState("");
+
+  // When tier changes, reset specialty
+  const handleTierChange = (newTier: string) => {
+    setTier(newTier);
+    setSpecialty("");
+  };
+
+  // Get specialties for the selected tier
+  const specialtyOptions = tier ? (SPECIALTY_BY_TIER[tier] || []) : [];
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -88,8 +183,8 @@ export default function ProvidersPage() {
             </label>
             <select
               value={tier}
-              onChange={(e) => setTier(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => handleTierChange(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {TIER_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -102,23 +197,31 @@ export default function ProvidersPage() {
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Specialty
             </label>
-            <input
-              type="text"
+            <select
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
-              placeholder="e.g. Cardiology"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              disabled={!tier}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">
+                {tier ? "All Specialties" : "Select a tier first"}
+              </option>
+              {specialtyOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={setDate}
+              min={new Date().toISOString().split('T')[0]}
+              placeholder="Select a date"
             />
           </div>
         </div>

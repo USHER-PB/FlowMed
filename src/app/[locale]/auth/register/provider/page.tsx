@@ -6,6 +6,165 @@ import Link from 'next/link';
 
 type ProviderTier = 'TIER_1_DOCTOR' | 'TIER_2_NURSE' | 'TIER_3_CERTIFIED_WORKER' | 'TIER_4_STUDENT' | 'TIER_5_VOLUNTEER';
 
+const SPECIALTY_GROUPS_BY_TIER: Record<string, { group: string; options: string[] }[]> = {
+  TIER_1_DOCTOR: [
+    {
+      group: 'Primary Care / Soins Primaires',
+      options: [
+        'General Practice / Médecine Générale',
+        'Family Medicine / Médecine de Famille',
+        'Internal Medicine / Médecine Interne',
+        'Emergency Medicine / Médecine d\'Urgence',
+      ],
+    },
+    {
+      group: 'Specialized Medicine / Médecine Spécialisée',
+      options: [
+        'Cardiology / Cardiologie',
+        'Dermatology / Dermatologie',
+        'Endocrinology / Endocrinologie',
+        'Gastroenterology / Gastroentérologie',
+        'Hematology / Hématologie',
+        'Infectious Disease / Maladies Infectieuses',
+        'Nephrology / Néphrologie',
+        'Neurology / Neurologie',
+        'Oncology / Oncologie',
+        'Pulmonology / Pneumologie',
+        'Rheumatology / Rhumatologie',
+      ],
+    },
+    {
+      group: 'Surgery / Chirurgie',
+      options: [
+        'General Surgery / Chirurgie Générale',
+        'Orthopedic Surgery / Chirurgie Orthopédique',
+        'Neurosurgery / Neurochirurgie',
+        'Cardiovascular Surgery / Chirurgie Cardiovasculaire',
+        'Plastic Surgery / Chirurgie Plastique',
+      ],
+    },
+    {
+      group: 'Women & Children / Femmes & Enfants',
+      options: [
+        'Gynecology / Gynécologie',
+        'Obstetrics / Obstétrique',
+        'Pediatrics / Pédiatrie',
+        'Neonatology / Néonatologie',
+      ],
+    },
+    {
+      group: 'Sensory & Mental / Sensoriel & Mental',
+      options: [
+        'Ophthalmology / Ophtalmologie',
+        'Otolaryngology (ENT) / ORL',
+        'Psychiatry / Psychiatrie',
+      ],
+    },
+    {
+      group: 'Diagnostics / Diagnostics',
+      options: [
+        'Radiology / Radiologie',
+        'Pathology / Anatomopathologie',
+        'Anesthesiology / Anesthésiologie',
+        'Laboratory Medicine / Médecine de Laboratoire',
+      ],
+    },
+  ],
+  TIER_2_NURSE: [
+    {
+      group: 'General Nursing / Soins Infirmiers Généraux',
+      options: [
+        'General Nursing / Soins Infirmiers Généraux',
+        'Community Health Nursing / Santé Communautaire',
+        'Home Care Nursing / Soins à Domicile',
+      ],
+    },
+    {
+      group: 'Specialized Nursing / Soins Infirmiers Spécialisés',
+      options: [
+        'Pediatric Nursing / Soins Infirmiers Pédiatriques',
+        'Surgical Nursing / Soins Infirmiers Chirurgicaux',
+        'Intensive Care Nursing / Soins Intensifs',
+        'Oncology Nursing / Soins Infirmiers en Oncologie',
+        'Psychiatric Nursing / Soins Infirmiers Psychiatriques',
+        'Geriatric Nursing / Soins Infirmiers Gériatriques',
+        'Emergency Nursing / Soins Infirmiers d\'Urgence',
+      ],
+    },
+    {
+      group: 'Midwifery / Sage-Femme',
+      options: [
+        'Midwifery / Sage-Femme',
+        'Obstetric Nursing / Soins Infirmiers Obstétricaux',
+        'Neonatal Nursing / Soins Infirmiers Néonataux',
+      ],
+    },
+  ],
+  TIER_3_CERTIFIED_WORKER: [
+    {
+      group: 'Allied Health / Paramédical',
+      options: [
+        'Physiotherapy / Kinésithérapie',
+        'Pharmacy / Pharmacie',
+        'Nutrition & Dietetics / Nutrition & Diététique',
+        'Medical Laboratory / Laboratoire Médical',
+        'Dental Hygiene / Hygiène Dentaire',
+        'Optometry / Optométrie',
+        'Radiology Technology / Technologie Radiologique',
+        'Medical Imaging / Imagerie Médicale',
+      ],
+    },
+    {
+      group: 'Community Health / Santé Communautaire',
+      options: [
+        'Community Health Worker / Agent de Santé Communautaire',
+        'Health Promotion / Promotion de la Santé',
+        'Environmental Health / Santé Environnementale',
+      ],
+    },
+    {
+      group: 'Rehabilitation / Réhabilitation',
+      options: [
+        'Occupational Therapy / Ergothérapie',
+        'Speech Therapy / Orthophonie',
+        'Prosthetics & Orthotics / Prothèses & Orthèses',
+      ],
+    },
+  ],
+  TIER_4_STUDENT: [
+    {
+      group: 'Medical Studies / Études Médicales',
+      options: [
+        'Medicine / Médecine',
+        'Surgery / Chirurgie',
+        'Pediatrics / Pédiatrie',
+        'Gynecology-Obstetrics / Gynécologie-Obstétrique',
+        'Internal Medicine / Médecine Interne',
+      ],
+    },
+    {
+      group: 'Nursing Studies / Études Infirmières',
+      options: [
+        'General Nursing / Soins Infirmiers',
+        'Midwifery / Sage-Femme',
+        'Pediatric Nursing / Soins Infirmiers Pédiatriques',
+      ],
+    },
+  ],
+  TIER_5_VOLUNTEER: [
+    {
+      group: 'Volunteer Areas / Domaines de Bénévolat',
+      options: [
+        'First Aid / Premiers Secours',
+        'Health Education / Éducation Sanitaire',
+        'Community Support / Soutien Communautaire',
+        'Mental Health Support / Soutien en Santé Mentale',
+        'Elderly Care / Soins aux Personnes Âgées',
+      ],
+    },
+  ],
+};
+
 export default function ProviderRegisterPage() {
   const params = useParams();
   const router = useRouter();
@@ -222,7 +381,11 @@ export default function ProviderRegisterPage() {
               <select
                 id="tier"
                 value={tier}
-                onChange={(e) => setTier(e.target.value as ProviderTier)}
+                onChange={(e) => {
+                  setTier(e.target.value as ProviderTier);
+                  // Reset specialty when tier changes
+                  setFormData(prev => ({ ...prev, specialty: '', licenseNumber: '' }));
+                }}
                 required
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               >
@@ -303,15 +466,23 @@ export default function ProviderRegisterPage() {
                 <label htmlFor="specialty" className="block text-sm font-medium text-gray-700 mb-2">
                   {t.specialty} {tier === 'TIER_1_DOCTOR' && '*'}
                 </label>
-                <input
+                <select
                   id="specialty"
                   name="specialty"
-                  type="text"
                   required={tier === 'TIER_1_DOCTOR'}
                   value={formData.specialty}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                />
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                >
+                  <option value="">{locale === 'fr' ? '-- Choisir une spécialité --' : '-- Select a specialty --'}</option>
+                  {(SPECIALTY_GROUPS_BY_TIER[tier] || []).map((group) => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.options.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </div>
             )}
 

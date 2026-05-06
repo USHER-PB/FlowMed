@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * GET /api/providers/[id]
+ *
+ * Public endpoint — returns a single provider's details for the booking page.
+ * Only returns APPROVED providers.
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -15,19 +21,7 @@ export async function GET(
         lastName: true,
         specialty: true,
         verificationStatus: true,
-        studentYear: true,
         consultationFee: true,
-        medicalCenterId: true,
-        createdAt: true,
-        supervisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            tier: true,
-            verificationStatus: true,
-          },
-        },
         availability: {
           select: {
             id: true,
@@ -35,6 +29,7 @@ export async function GET(
             startTime: true,
             endTime: true,
           },
+          orderBy: { dayOfWeek: "asc" },
         },
         medicalCenter: {
           select: {
@@ -50,12 +45,15 @@ export async function GET(
       return NextResponse.json({ error: "Provider not found" }, { status: 404 });
     }
 
+    if (provider.verificationStatus !== "APPROVED") {
+      return NextResponse.json({ error: "Provider not found" }, { status: 404 });
+    }
+
     return NextResponse.json({
       provider: {
         ...provider,
-        consultationFee: provider.consultationFee ? Number(provider.consultationFee) : null,
-        // Verification badge: true only when APPROVED
-        verificationBadge: provider.verificationStatus === "APPROVED",
+        consultationFee: provider.consultationFee ? Number(provider.consultationFee) : undefined,
+        verificationBadge: true,
       },
     });
   } catch (error) {

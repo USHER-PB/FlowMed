@@ -2,16 +2,44 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const router = useRouter();
   const locale = params.locale as string;
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.user) {
+          router.replace(`/${locale}/auth/login`);
+        } else if (data.user.role === "PROVIDER") {
+          // Provider accidentally on patient page — redirect to provider dashboard
+          router.replace(`/${locale}/provider-dashboard`);
+        } else {
+          setChecking(false);
+        }
+      })
+      .catch(() => {
+        router.replace(`/${locale}/auth/login`);
+      });
+  }, [locale, router]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push(`/${locale}/auth/login`);
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

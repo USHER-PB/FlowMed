@@ -83,6 +83,9 @@ export async function POST(req: NextRequest) {
 
     if ("specialty" in data) providerData.specialty = data.specialty ?? null;
     if ("licenseNumber" in data) providerData.licenseNumber = data.licenseNumber ?? null;
+    if ("licenseExpiryDate" in data && data.licenseExpiryDate) {
+      providerData.licenseExpiryDate = new Date(data.licenseExpiryDate);
+    }
     if (tier === "TIER_4_STUDENT") {
       providerData.supervisorId = data.supervisorId;
       providerData.studentYear = data.studentYear;

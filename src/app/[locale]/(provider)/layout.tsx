@@ -2,16 +2,47 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const router = useRouter();
   const locale = params.locale as string;
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // Verify the logged-in user is actually a PROVIDER
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.user || data.user.role !== "PROVIDER") {
+          // Not a provider — redirect to correct page
+          if (data.user?.role === "PATIENT") {
+            router.replace(`/${locale}/dashboard`);
+          } else {
+            router.replace(`/${locale}/auth/login`);
+          }
+        } else {
+          setChecking(false);
+        }
+      })
+      .catch(() => {
+        router.replace(`/${locale}/auth/login`);
+      });
+  }, [locale, router]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push(`/${locale}/auth/login`);
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

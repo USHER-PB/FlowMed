@@ -1,15 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/nextauth-options";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/middleware";
 import { updateProviderProfileSchema } from "@/lib/validations/provider";
 
-export async function GET(req: NextRequest) {
+async function getProviderUserId(req: NextRequest): Promise<string | null> {
+  // Try custom JWT cookie first
   const auth = requireRole(req, ["PROVIDER"]);
-  if (auth.error) return auth.error;
+  if (!auth.error) return auth.user.userId;
+
+  // Fall back to NextAuth session
+  try {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, role: true },
+      });
+      if (user?.role === "PROVIDER") return user.id;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const userId = await getProviderUserId(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const provider = await prisma.provider.findUnique({
-      where: { userId: auth.user.userId },
+      where: { userId },
       include: {
         user: {
           select: {
@@ -63,8 +88,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireRole(req, ["PROVIDER"]);
-  if (auth.error) return auth.error;
+  const userId = await getProviderUserId(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const body = await req.json();
@@ -78,7 +105,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const provider = await prisma.provider.findUnique({
-      where: { userId: auth.user.userId },
+      where: { userId },
     });
 
     if (!provider) {

@@ -1,6 +1,6 @@
 {
-  "name": "HealthMarket Cameroon",
-  "short_name": "HealthMarket",
+  "name": "FlowMed Cameroon",
+  "short_name": "FlowMed",
   "description": "Connecting patients with healthcare providers across Cameroon",
   "start_url": "/",
   "display": "standalone",
@@ -10,16 +10,21 @@
   "lang": "fr",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
   ],
   "categories": ["health", "medical"],

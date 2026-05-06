@@ -1,16 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/nextauth-options";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
 
 export async function GET(req: NextRequest) {
-  const authResult = requireAuth(req);
-  if (authResult.error) return authResult.error;
+  let userId: string | null = null;
 
-  const { user: tokenUser } = authResult;
+  // First try our custom JWT cookie
+  const authResult = requireAuth(req);
+  if (!authResult.error) {
+    userId = authResult.user.userId;
+  } else {
+    // Fall back to NextAuth session (Google login)
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: { id: true },
+        });
+        if (dbUser) userId = dbUser.id;
+      }
+    } catch {
+      // NextAuth not configured or session not found
+    }
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id: tokenUser.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,

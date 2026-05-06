@@ -8,6 +8,13 @@ interface Patient {
   lastName: string;
 }
 
+interface Appointment {
+  id: string;
+  dateTime: string;
+  status: string;
+  patient: Patient;
+}
+
 interface QueueItem {
   id: string;
   position: number;
@@ -46,7 +53,7 @@ const TIER_LABELS: Record<string, string> = {
 export default function ProviderDashboardPage() {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -75,7 +82,7 @@ export default function ProviderDashboardPage() {
         const upcoming = (apptData.appointments ?? []).filter(
           (a: { dateTime: string }) => new Date(a.dateTime) > now
         );
-        setUpcomingCount(upcoming.length);
+        setUpcomingAppointments(upcoming.slice(0, 5));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -146,7 +153,7 @@ export default function ProviderDashboardPage() {
           <div className="text-xs text-gray-500 mt-1">In Queue Today</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <div className="text-3xl font-bold text-blue-600">{upcomingCount}</div>
+          <div className="text-3xl font-bold text-blue-600">{upcomingAppointments.length}</div>
           <div className="text-xs text-gray-500 mt-1">Upcoming Appointments</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
@@ -178,7 +185,6 @@ export default function ProviderDashboardPage() {
       {/* Today's Queue */}
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Today&apos;s Queue</h2>
-
         {activeItem && (
           <div className="mb-3 rounded-lg border border-blue-300 bg-blue-50 p-4">
             <div className="text-xs font-medium text-blue-700 mb-1">Currently in consultation</div>
@@ -271,6 +277,46 @@ export default function ProviderDashboardPage() {
                   </div>
                 </div>
               ))}
+          </div>
+        )}
+      </div>
+
+      {/* Upcoming Appointments */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Upcoming Appointments</h2>
+        {upcomingAppointments.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500 text-sm">
+            No upcoming appointments scheduled.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {upcomingAppointments.map((appt) => (
+              <div
+                key={appt.id}
+                className="rounded-lg border border-gray-200 bg-white p-4 flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-medium text-gray-900">
+                    {appt.patient.firstName} {appt.patient.lastName}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-1 rounded text-xs font-medium">
+                      📅 {new Date(appt.dateTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                    <span className="flex items-center gap-1 text-teal-700 bg-teal-50 px-2 py-1 rounded text-xs font-medium">
+                      🕐 {new Date(appt.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  appt.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
+                  appt.status === 'PENDING_SUPERVISOR_APPROVAL' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {appt.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
