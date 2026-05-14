@@ -6,8 +6,11 @@ export const defaultLocale = 'fr' as const;
 
 export type Locale = (typeof locales)[number];
 
-export default getRequestConfig(async ({ locale }) => {
-  // Validate that the incoming `locale` parameter is valid
+export default getRequestConfig(async ({ requestLocale }) => {
+  // Await the incoming locale (next-intl v4 API)
+  const locale = await requestLocale;
+
+  // Validate that the locale parameter is valid
   if (!locale || !locales.includes(locale as Locale)) {
     notFound();
   }

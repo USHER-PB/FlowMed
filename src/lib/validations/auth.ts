@@ -149,9 +149,12 @@ export const medicalCenterRegisterSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
   phone: z.string().optional(),
   name: z.string().min(1, "Medical center name is required"),
+  city: z.string().min(1, "City is required"),
   address: z.string().min(1, "Address is required"),
   centerPhone: z.string().min(1, "Center phone number is required"),
-  verificationDocs: z.string().optional(), // JSON array of doc URLs
+  verificationDocs: z.string().optional(),
+  // If provided, the user wants to claim an existing seeded hospital
+  claimHospitalId: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------

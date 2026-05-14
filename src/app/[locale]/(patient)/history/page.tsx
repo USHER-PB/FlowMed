@@ -1,232 +1,157 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-
-interface Supervisor {
-  firstName: string;
-  lastName: string;
-  tier: string;
-}
-
-interface Prescription {
-  drugName: string;
-  dosage: string;
-  duration: string;
-  instructions?: string;
-}
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 
 interface Diagnosis {
-  id: string;
-  diagnosisText: string;
-  prescriptions?: Prescription[] | null;
-  recommendations?: string | null;
-  followUpDate?: string | null;
-  requiresSupervisorApproval: boolean;
-  supervisorApproved?: boolean | null;
-  supervisor?: Supervisor | null;
-  createdAt: string;
+  id: string
+  appointmentId: string
+  appointmentDate: string
+  providerName: string
+  providerType: string
+  diagnosis: string
+  notes: string | null
+  status: string
+  prescription: string | null
 }
 
-interface Provider {
-  id: string;
-  firstName: string;
-  lastName: string;
-  tier: string;
-  specialty?: string | null;
-}
+function DiagnosisCard({ diagnosis, locale }: { diagnosis: Diagnosis; locale: string }) {
+  return (
+    <Card variant='default' className='hover:shadow-card-hover transition-shadow'>
+      <CardBody className='p-5'>
+        <div className='flex items-start justify-between gap-4 mb-4'>
+          <div className='flex items-start gap-4'>
+            <div className='flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-600'>
+              <svg className='h-6 w-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />
+              </svg>
+            </div>
+            <div>
+              <h3 className='font-semibold text-body-lg text-surface-900'>{diagnosis.providerName}</h3>
+              <p className='text-body-sm text-surface-600'>{diagnosis.providerType}</p>
+              <p className='text-body-xs text-surface-500 mt-1'>
+                {new Date(diagnosis.appointmentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
+          <Badge variant={diagnosis.status === 'APPROVED' ? 'success' : 'warning'} size='sm'>
+            {diagnosis.status}
+          </Badge>
+        </div>
 
-interface HistoryEntry {
-  id: string;
-  dateTime: string;
-  status: string;
-  provider: Provider;
-  diagnosis: Diagnosis | null;
-  createdAt: string;
-}
+        <div className='space-y-3'>
+          <div>
+            <h4 className='text-body-xs font-medium text-surface-500 uppercase tracking-wide mb-1'>Diagnosis</h4>
+            <p className='text-body-sm text-surface-800'>{diagnosis.diagnosis}</p>
+          </div>
 
-const TIER_LABELS: Record<string, string> = {
-  TIER_1_DOCTOR: "Doctor",
-  TIER_2_NURSE: "Nurse",
-  TIER_3_CERTIFIED_WORKER: "Certified Worker",
-  TIER_4_STUDENT: "Medical Student",
-  TIER_5_VOLUNTEER: "Health Volunteer",
-};
+          {diagnosis.prescription && (
+            <div>
+              <h4 className='text-body-xs font-medium text-surface-500 uppercase tracking-wide mb-1'>Prescription</h4>
+              <p className='text-body-sm text-surface-700'>{diagnosis.prescription}</p>
+            </div>
+          )}
+
+          {diagnosis.notes && (
+            <div>
+              <h4 className='text-body-xs font-medium text-surface-500 uppercase tracking-wide mb-1'>Notes</h4>
+              <p className='text-body-sm text-surface-600'>{diagnosis.notes}</p>
+            </div>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const params = useParams()
+  const locale = params.locale as string
+
+  const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
+    const load = async () => {
+      setLoading(true)
+      setError(null)
       try {
-        const res = await fetch(`/api/patients/me/history?page=${page}&pageSize=10`);
-        if (!res.ok) throw new Error("Failed to load history");
-        const data = await res.json();
-        setHistory(data.data ?? []);
-        setTotalPages(data.pagination?.totalPages ?? 1);
+        const res = await fetch('/api/patients/me/history')
+        if (!res.ok) throw new Error('Failed to load history')
+        const data = await res.json()
+        setDiagnoses(data.diagnoses || [])
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load history");
+        setError(e instanceof Error ? e.message : 'Failed to load history')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    load();
-  }, [page]);
+    load()
+  }, [])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Medical History</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Your complete timeline of past appointments and diagnoses.
-        </p>
+    <div className='min-h-screen bg-surface-50'>
+      <div className='bg-gradient-to-r from-brand-500 to-brand-600 py-12 px-4'>
+        <div className='mx-auto max-w-7xl'>
+          <h1 className='text-3xl font-bold text-white mb-2'>Medical History</h1>
+          <p className='text-brand-100'>View your past diagnoses and treatment records</p>
+        </div>
       </div>
 
-      {loading && (
-        <div className="text-center py-10 text-gray-500 text-sm">Loading...</div>
-      )}
-
-      {error && (
-        <div className="rounded-md bg-red-50 p-3 text-red-700 text-sm">{error}</div>
-      )}
-
-      {!loading && !error && history.length === 0 && (
-        <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-gray-400 text-sm">
-          No medical history yet.{" "}
-          <Link href="/providers" className="text-blue-600 hover:underline">
-            Book your first appointment
+      <div className='mx-auto max-w-7xl px-4 py-8'>
+        <div className='mb-6'>
+          <Link href={`/${locale}/appointments`}>
+            <Button variant='ghost' size='sm'>
+              <svg className='h-4 w-4 mr-1.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M10 19l-7-7m0 0l7-7m-7 7h18' />
+              </svg>
+              Back to Appointments
+            </Button>
           </Link>
-          .
         </div>
-      )}
 
-      {!loading && history.length > 0 && (
-        <div className="relative">
-          {/* Timeline line */}
-          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
-
-          <div className="space-y-6 pl-10">
-            {history.map((entry) => (
-              <div key={entry.id} className="relative">
-                {/* Timeline dot */}
-                <div className="absolute -left-6 top-4 w-3 h-3 rounded-full border-2 border-blue-500 bg-white" />
-
-                <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {entry.provider.firstName} {entry.provider.lastName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {TIER_LABELS[entry.provider.tier] ?? entry.provider.tier}
-                        {entry.provider.specialty ? ` · ${entry.provider.specialty}` : ""}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-400 text-right">
-                      {new Date(entry.dateTime).toLocaleDateString()}
-                      <br />
-                      {new Date(entry.dateTime).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Diagnosis */}
-                  {entry.diagnosis ? (
-                    <div className="space-y-2">
-                      <div className="text-sm">
-                        <span className="font-medium text-gray-700">Diagnosis: </span>
-                        <span className="text-gray-600">{entry.diagnosis.diagnosisText}</span>
-                      </div>
-
-                      {entry.diagnosis.prescriptions &&
-                        entry.diagnosis.prescriptions.length > 0 && (
-                          <div className="text-sm">
-                            <span className="font-medium text-gray-700">Prescriptions: </span>
-                            <ul className="mt-1 space-y-1">
-                              {entry.diagnosis.prescriptions.map((rx, i) => (
-                                <li key={i} className="text-gray-600 text-xs pl-2 border-l-2 border-blue-200">
-                                  <strong>{rx.drugName}</strong> — {rx.dosage}, {rx.duration}
-                                  {rx.instructions ? ` (${rx.instructions})` : ""}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                      {entry.diagnosis.recommendations && (
-                        <div className="text-sm">
-                          <span className="font-medium text-gray-700">Recommendations: </span>
-                          <span className="text-gray-600">{entry.diagnosis.recommendations}</span>
-                        </div>
-                      )}
-
-                      {entry.diagnosis.supervisor && (
-                        <div className="text-xs text-gray-400">
-                          Supervised by {entry.diagnosis.supervisor.firstName}{" "}
-                          {entry.diagnosis.supervisor.lastName}
-                        </div>
-                      )}
-
-                      {entry.diagnosis.requiresSupervisorApproval &&
-                        !entry.diagnosis.supervisorApproved && (
-                          <div className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-1">
-                            Pending supervisor review
-                          </div>
-                        )}
-
-                      {/* Download PDF link */}
-                      <a
-                        href={`/api/diagnoses/${entry.diagnosis.id}/pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                      >
-                        📄 Download PDF
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-400 italic">
-                      No diagnosis recorded for this visit.
-                    </div>
-                  )}
-                </div>
-              </div>
+        {loading ? (
+          <div className='flex items-center justify-center py-12'>
+            <div className='h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600' />
+          </div>
+        ) : error ? (
+          <Card variant='default' className='border-status-error-200 bg-status-error-50'>
+            <CardBody className='p-6 text-center'>
+              <svg className='mx-auto h-12 w-12 text-status-error-400 mb-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' />
+              </svg>
+              <p className='text-status-error-600 mb-4'>{error}</p>
+              <Button variant='primary' size='sm' onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </CardBody>
+          </Card>
+        ) : diagnoses.length === 0 ? (
+          <Card variant='default' className='border-dashed border-surface-300'>
+            <CardBody className='p-12 text-center'>
+              <svg className='mx-auto h-16 w-16 text-surface-300 mb-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={1.5} d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />
+              </svg>
+              <h3 className='text-lg font-medium text-surface-900 mb-2'>No medical history yet</h3>
+              <p className='text-surface-500 mb-4'>Your diagnoses and treatment records will appear here after your appointments</p>
+              <Link href={`/${locale}/providers`}>
+                <Button variant='primary'>Book an Appointment</Button>
+              </Link>
+            </CardBody>
+          </Card>
+        ) : (
+          <div className='space-y-6'>
+            {diagnoses.map((diagnosis) => (
+              <DiagnosisCard key={diagnosis.id} diagnosis={diagnosis} locale={locale} />
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-500">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  );
+  )
 }

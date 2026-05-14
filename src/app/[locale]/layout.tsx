@@ -1,57 +1,31 @@
-import type { Metadata, Viewport } from "next";
-import { notFound } from 'next/navigation';
-import SessionProvider from "@/components/SessionProvider";
-import "../globals.css";
+import { NextIntlClientProvider, hasLocale } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { notFound } from "next/navigation";
+import { locales } from "@/i18n";
 
-const locales = ['en', 'fr'];
-
-export const metadata: Metadata = {
-  title: "FlowMed Cameroon - Healthcare Marketplace Platform",
-  description: "Connecting patients with healthcare providers across Cameroon. Book appointments, manage medical records, and access quality healthcare services.",
-  keywords: ["healthcare", "Cameroon", "medical", "appointments", "telemedicine"],
-  authors: [{ name: "FlowMed Cameroon" }],
-  icons: {
-    icon: [
-      { url: '/favicon.svg?v=3', type: 'image/svg+xml' },
-      { url: '/favicon.ico?v=3', sizes: 'any' },
-    ],
-    apple: '/apple-touch-icon.png?v=3',
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#0d9488",
-  width: "device-width",
-  initialScale: 1,
-  minimumScale: 1,
-};
-
-export default function LocaleLayout({
-  children,
-  params,
-}: {
+interface Props {
   children: React.ReactNode;
-  params: { locale: string };
-}) {
-  const { locale } = params;
-  
-  if (!locales.includes(locale)) {
+  params: Promise<{ locale: string }>;
+}
+
+export function generateStaticParams() {
+  return locales.map((locale) => ({ locale }));
+}
+
+export default async function LocaleLayout({ children, params }: Props) {
+  const { locale } = await params;
+
+  // Validate locale
+  if (!hasLocale(locales, locale)) {
     notFound();
   }
 
+  // Load messages for the locale
+  const messages = await getMessages();
+
   return (
-    <html lang={locale}>
-      <head>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
-        <link rel="alternate icon" href="/favicon.ico?v=3" />
-      </head>
-      <body>
-        <SessionProvider>
-          <div className="min-h-screen bg-gray-50">
-            {children}
-          </div>
-        </SessionProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      {children}
+    </NextIntlClientProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parsePaginationParams } from "@/lib/db/pagination";
+import { autoSeedHospitals } from "@/lib/db/auto-seed";
 
 /**
  * GET /api/medical-centers
@@ -15,25 +16,29 @@ import { parsePaginationParams } from "@/lib/db/pagination";
  *   pageSize  — items per page, default 20, max 100
  */
 export async function GET(req: NextRequest) {
+  // Auto-seed hospitals on first request if DB is empty
+  await autoSeedHospitals();
+
   try {
     const { searchParams } = new URL(req.url);
 
     const city = searchParams.get("city") ?? undefined;
     const search = searchParams.get("search") ?? undefined;
     const page = parseInt(searchParams.get("page") ?? "1", 10);
-    const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10);
+    const pageSize = parseInt(searchParams.get("pageSize") ?? "50", 10);
 
     const { skip, take, page: normalizedPage, pageSize: normalizedPageSize } =
       parsePaginationParams({ page, pageSize });
 
     const where = {
       verificationStatus: "APPROVED" as const,
-      ...(city ? { city } : {}),
+      ...(city ? { city: { contains: city } } : {}),
       ...(search
         ? {
             OR: [
               { name: { contains: search } },
               { address: { contains: search } },
+              { city: { contains: search } },
             ],
           }
         : {}),
@@ -44,7 +49,7 @@ export async function GET(req: NextRequest) {
         where,
         skip,
         take: normalizedPageSize,
-        orderBy: { name: "asc" },
+        orderBy: [{ city: "asc" }, { name: "asc" }],
         select: {
           id: true,
           name: true,

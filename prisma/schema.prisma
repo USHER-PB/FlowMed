@@ -115,6 +115,9 @@ model Provider {
   // Pricing
   consultationFee     Decimal?           @db.Decimal(10, 2)
 
+  // Invitations received from medical centers
+  invitations         ProviderInvitation[]
+
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -137,6 +140,7 @@ model MedicalCenter {
 
   providers          Provider[]
   appointments       Appointment[]
+  invitations        ProviderInvitation[]
 
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -255,4 +259,50 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// Tracks invitations sent by a medical center to a doctor
+// The doctor must accept + verify their license before being linked
+model ProviderInvitation {
+  id              String             @id @default(uuid())
+  medicalCenterId String
+  medicalCenter   MedicalCenter      @relation(fields: [medicalCenterId], references: [id], onDelete: Cascade)
+
+  // Who was invited
+  invitedEmail    String
+  invitedName     String             // Name the hospital claims for this doctor
+  licenseNumber   String?            // License number the hospital provides (optional)
+  specialty       String?
+  tier            ProviderTier       @default(TIER_1_DOCTOR)
+
+  // Invitation token (sent in email link)
+  token           String             @unique
+  tokenExpiresAt  DateTime
+
+  // Status lifecycle
+  status          InvitationStatus   @default(PENDING)
+
+  // Set once the doctor accepts and creates their account
+  providerId      String?
+  provider        Provider?          @relation(fields: [providerId], references: [id])
+
+  // Admin verification notes
+  adminNotes      String?            @db.Text
+  verifiedByAdmin Boolean            @default(false)
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([medicalCenterId])
+  @@index([token])
+  @@index([invitedEmail])
+  @@index([status])
+}
+
+enum InvitationStatus {
+  PENDING    // Sent, waiting for doctor to accept
+  ACCEPTED   // Doctor created account and linked
+  EXPIRED    // Token expired before acceptance
+  CANCELLED  // Hospital cancelled the invitation
+  REJECTED   // Doctor declined
 }
